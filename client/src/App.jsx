@@ -1,7 +1,22 @@
 import { Activity, Mic2, Music2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { HarmoniumPage } from "./pages/HarmoniumPage.jsx";
 
 export default function App() {
+  const [path, setPath] = useState(window.location.pathname);
+  const activePath = useMemo(() => (path === "/" ? "/harmonium" : path), [path]);
+
+  useEffect(() => {
+    if (window.location.pathname === "/") {
+      window.history.replaceState({}, "", "/harmonium");
+      setPath("/harmonium");
+    }
+
+    const onPopState = () => setPath(window.location.pathname);
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -36,9 +51,8 @@ export default function App() {
             <strong>Detect pitch</strong>
           </div>
         </section>
-        <HarmoniumPage />
+        {activePath === "/harmonium" ? <HarmoniumPage /> : <HarmoniumPage />}
       </main>
     </div>
   );
 }
-
