@@ -1,0 +1,44 @@
+import { Activity, Mic2, Music2 } from "lucide-react";
+import { HarmoniumPage } from "./pages/HarmoniumPage.jsx";
+
+export default function App() {
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <div className="brand-lockup">
+          <div className="brand-mark">
+            <Music2 size={22} aria-hidden="true" />
+          </div>
+          <div>
+            <p className="eyebrow">SurSadhana AI</p>
+            <h1>Harmonium Pitch Practice</h1>
+          </div>
+        </div>
+        <div className="server-pill">
+          <Activity size={16} aria-hidden="true" />
+          FastAPI analysis
+        </div>
+      </header>
+
+      <main>
+        <section className="hero-band">
+          <div>
+            <p className="eyebrow">MVP practice mode</p>
+            <h2>Match your voice to a target harmonium note.</h2>
+            <p>
+              Select Sa, Re, Ga, Ma, Pa, Dha, Ni, or upper Sa, then record a short
+              vocal sample for backend pitch analysis.
+            </p>
+          </div>
+          <div className="hero-stat" aria-label="Recording and pitch analysis">
+            <Mic2 size={30} aria-hidden="true" />
+            <span>Record</span>
+            <strong>Detect pitch</strong>
+          </div>
+        </section>
+        <HarmoniumPage />
+      </main>
+    </div>
+  );
+}
+
