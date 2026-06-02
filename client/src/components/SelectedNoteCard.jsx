@@ -1,9 +1,11 @@
 export function SelectedNoteCard({ note }) {
+  const label = note.sargam || "Ref";
+
   return (
     <div className="info-card selected-note-card">
       <p className="eyebrow">Selected target</p>
       <div className="selected-note">
-        <span>{note.sargam}</span>
+        <span>{label}</span>
         <strong>{note.note}</strong>
       </div>
       <dl>
@@ -14,11 +16,10 @@ export function SelectedNoteCard({ note }) {
         <div>
           <dt>Mapping</dt>
           <dd>
-            {note.note} = {note.sargam}
+            {note.sargam ? `${note.note} = ${note.sargam}` : `${note.note} reference`}
           </dd>
         </div>
       </dl>
     </div>
   );
 }
-

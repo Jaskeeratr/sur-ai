@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { HARMONIUM_NOTES } from "../data/notes.js";
+import { DEFAULT_HARMONIUM_NOTE, HARMONIUM_NOTES } from "../data/notes.js";
 import { HarmoniumKeyboard } from "../components/HarmoniumKeyboard.jsx";
 import { PracticeInstructions } from "../components/PracticeInstructions.jsx";
 import { SelectedNoteCard } from "../components/SelectedNoteCard.jsx";
@@ -17,7 +17,7 @@ async function checkBackendHealth() {
 }
 
 export function HarmoniumPage() {
-  const [selectedNote, setSelectedNote] = useState(HARMONIUM_NOTES[0]);
+  const [selectedNote, setSelectedNote] = useState(DEFAULT_HARMONIUM_NOTE);
   const [analysis, setAnalysis] = useState(null);
   const [analysisError, setAnalysisError] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
