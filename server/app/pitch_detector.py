@@ -150,6 +150,43 @@ def _estimate_frequency_yin(frame: list[float], sample_rate: int) -> tuple[float
     return frequency, confidence
 
 
+def _estimate_frequency_autocorrelation(frame: list[float], sample_rate: int) -> tuple[float, float] | None:
+    if _rms(frame) < 0.003:
+        return None
+
+    prepared = _preprocess_frame(frame)
+    energy = sum(sample * sample for sample in prepared)
+    if energy <= 0:
+        return None
+
+    min_lag = max(2, int(sample_rate / MAX_VOICE_FREQUENCY))
+    max_lag = min(len(prepared) // 2, int(sample_rate / MIN_VOICE_FREQUENCY))
+    best_lag = 0
+    best_score = 0.0
+
+    for lag in range(min_lag, max_lag + 1):
+        score = 0.0
+        lagged_energy = 0.0
+        for index in range(len(prepared) - lag):
+            current = prepared[index]
+            lagged = prepared[index + lag]
+            score += current * lagged
+            lagged_energy += lagged * lagged
+
+        if lagged_energy <= 0:
+            continue
+
+        normalized = score / math.sqrt(energy * lagged_energy)
+        if normalized > best_score:
+            best_score = normalized
+            best_lag = lag
+
+    if best_lag == 0 or best_score < 0.18:
+        return None
+
+    return sample_rate / best_lag, min(0.67, max(0.25, best_score))
+
+
 def _build_frames(samples: list[float], sample_rate: int) -> tuple[list[tuple[float, list[float]]], list[float]]:
     frame_length = min(4096, max(1024, int(sample_rate * 0.11)))
     hop_length = max(256, int(sample_rate * 0.02))
@@ -190,6 +227,8 @@ def detect_pitch_points(file_path: Path) -> dict:
 
         estimate = _estimate_frequency_yin(frame, sample_rate)
         if estimate is None:
+            estimate = _estimate_frequency_autocorrelation(frame, sample_rate)
+        if estimate is None:
             continue
 
         frequency, confidence = estimate
@@ -225,6 +264,7 @@ def detect_pitch_points(file_path: Path) -> dict:
 
     return {
         "average_frequency": average_frequency,
+        "analysis_status": "pitch_detected",
         "duration": len(samples) / sample_rate,
         "voiced_frame_count": len(pitch_points),
         "pitch_points": pitch_points,

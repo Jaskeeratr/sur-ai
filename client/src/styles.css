@@ -402,7 +402,11 @@ dd {
 }
 
 .status-badge.sharp,
-.status-badge.flat {
+.status-badge.flat,
+.status-badge.too_sharp,
+.status-badge.too_flat,
+.status-badge.no_pitch,
+.status-badge.request_failed {
   background: #fff1e8;
   border-color: #ecc6ad;
   color: #984126;

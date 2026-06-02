@@ -52,21 +52,32 @@ export function SargamPage() {
 
       const nextAnalysis = await response.json();
       setAnalysis(nextAnalysis);
-      setResults((currentResults) => {
-        const withoutCurrent = currentResults.filter((result) => result.step !== selectedNote.step);
-        return [
-          ...withoutCurrent,
-          {
-            step: selectedNote.step,
-            sargam: selectedNote.sargam,
-            note: selectedNote.note,
-            accuracy: nextAnalysis.accuracy,
-            status: nextAnalysis.status
-          }
-        ].sort((first, second) => first.step - second.step);
-      });
+      if (nextAnalysis.comparison_available !== false) {
+        setResults((currentResults) => {
+          const withoutCurrent = currentResults.filter((result) => result.step !== selectedNote.step);
+          return [
+            ...withoutCurrent,
+            {
+              step: selectedNote.step,
+              sargam: selectedNote.sargam,
+              note: selectedNote.note,
+              accuracy: nextAnalysis.accuracy,
+              status: nextAnalysis.status
+            }
+          ].sort((first, second) => first.step - second.step);
+        });
+      }
     } catch (error) {
-      setAnalysisError(error.message);
+      setAnalysis({
+        analysis_status: "request_failed",
+        average_frequency: null,
+        detected_note: null,
+        comparison_available: false,
+        status: "request_failed",
+        accuracy: 0,
+        pitch_points: [],
+        feedback: `The backend could not be reached. ${error.message}`
+      });
     } finally {
       setIsAnalyzing(false);
     }
@@ -173,4 +184,3 @@ export function SargamPage() {
     </div>
   );
 }
-

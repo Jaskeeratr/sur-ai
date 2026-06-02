@@ -29,32 +29,35 @@ export function FeedbackCard({ analysis, isAnalyzing }) {
     );
   }
 
+  const hasFrequency = typeof analysis.average_frequency === "number";
+  const showComparison = analysis.comparison_available !== false;
+  const statusLabel = analysis.status ? analysis.status.replace("_", " ") : "analysis";
+
   return (
     <div className="info-card feedback-card">
       <p className="eyebrow">Pitch result</p>
       <div className={`status-badge ${analysis.status}`}>
         <CheckCircle2 size={17} aria-hidden="true" />
-        {analysis.status.replace("_", " ")}
+        {statusLabel}
       </div>
       <div className="metric-grid">
         <div>
           <Music size={18} aria-hidden="true" />
-          <span>Detected</span>
-          <strong>{analysis.detected_note || "-"}</strong>
+          <span>Frequency</span>
+          <strong>{hasFrequency ? `${analysis.average_frequency.toFixed(2)} Hz` : "-"}</strong>
         </div>
         <div>
           <SlidersHorizontal size={18} aria-hidden="true" />
-          <span>Cents off</span>
-          <strong>{formatSignedCents(analysis.cents_off)}</strong>
+          <span>{showComparison ? "Cents off" : "Detected note"}</span>
+          <strong>{showComparison ? formatSignedCents(analysis.cents_off) : analysis.detected_note || "-"}</strong>
         </div>
         <div>
           <Gauge size={18} aria-hidden="true" />
-          <span>Accuracy</span>
-          <strong>{Math.round(analysis.accuracy)}%</strong>
+          <span>{showComparison ? "Accuracy" : "Comparison"}</span>
+          <strong>{showComparison ? `${Math.round(analysis.accuracy)}%` : "Out of range"}</strong>
         </div>
       </div>
       <p className="feedback-text">{analysis.feedback}</p>
     </div>
   );
 }
-

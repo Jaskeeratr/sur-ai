@@ -50,7 +50,16 @@ export function HarmoniumPage() {
 
       setAnalysis(await response.json());
     } catch (error) {
-      setAnalysisError(error.message);
+      setAnalysis({
+        analysis_status: "request_failed",
+        average_frequency: null,
+        detected_note: null,
+        comparison_available: false,
+        status: "request_failed",
+        accuracy: 0,
+        pitch_points: [],
+        feedback: `The backend could not be reached. ${error.message}`
+      });
     } finally {
       setIsAnalyzing(false);
     }

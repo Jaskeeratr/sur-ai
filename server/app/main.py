@@ -27,6 +27,25 @@ def health_check():
     return {"status": "running"}
 
 
+def _no_pitch_response(target_note: str, target_frequency: float, detail: str) -> dict:
+    return {
+        "analysis_status": "no_pitch",
+        "target_note": target_note.upper(),
+        "target_frequency": target_frequency,
+        "average_frequency": None,
+        "detected_note": None,
+        "duration": 0,
+        "voiced_frame_count": 0,
+        "pitch_points": [],
+        "cents_off": None,
+        "raw_cents_off": None,
+        "comparison_available": False,
+        "status": "no_pitch",
+        "accuracy": 0,
+        "feedback": detail,
+    }
+
+
 @app.post("/analyze-note")
 async def analyze_note(file: UploadFile = File(...), target_note: str = Form(...)):
     try:
@@ -49,12 +68,16 @@ async def analyze_note(file: UploadFile = File(...), target_note: str = Form(...
         pitch_points = [
             {
                 **point,
-                "cents_off": round(cents_between(point["frequency"], target_frequency), 2),
+                "cents_off": round(cents_between(point["frequency"], target_frequency), 2)
+                if comparison["comparison_available"]
+                else None,
+                "raw_cents_off": round(cents_between(point["frequency"], target_frequency), 2),
             }
             for point in detection["pitch_points"]
         ]
 
         return {
+            "analysis_status": detection.get("analysis_status", "pitch_detected"),
             "target_note": target_note.upper(),
             "target_frequency": target_frequency,
             "average_frequency": round(average_frequency, 2),
@@ -65,7 +88,7 @@ async def analyze_note(file: UploadFile = File(...), target_note: str = Form(...
             **comparison,
         }
     except ValueError as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
+        return _no_pitch_response(target_note, target_frequency, str(error))
     except Exception as error:
         raise HTTPException(
             status_code=500,
