@@ -1,14 +1,18 @@
 import math
 
+_NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+
+
+def _frequency_for(note_name: str, octave: int) -> float:
+    semitone_index = _NOTE_NAMES.index(note_name)
+    midi_number = (octave + 1) * 12 + semitone_index
+    return round(440.0 * (2 ** ((midi_number - 69) / 12)), 2)
+
+
 NOTE_FREQUENCIES = {
-    "C4": 261.63,
-    "D4": 293.66,
-    "E4": 329.63,
-    "F4": 349.23,
-    "G4": 392.00,
-    "A4": 440.00,
-    "B4": 493.88,
-    "C5": 523.25,
+    f"{note_name}{octave}": _frequency_for(note_name, octave)
+    for octave in range(3, 7)
+    for note_name in _NOTE_NAMES
 }
 
 SARGAM_LABELS = {
@@ -24,7 +28,7 @@ SARGAM_LABELS = {
 
 
 def get_target_frequency(note: str) -> float:
-    normalized = note.strip().upper()
+    normalized = note.strip().upper().replace("♯", "#")
     if normalized not in NOTE_FREQUENCIES:
         supported = ", ".join(NOTE_FREQUENCIES)
         raise ValueError(f"Unsupported target note '{note}'. Supported notes: {supported}.")
@@ -43,4 +47,3 @@ def frequency_to_note(frequency: float) -> str | None:
 
 def cents_between(detected_frequency: float, target_frequency: float) -> float:
     return 1200 * math.log2(detected_frequency / target_frequency)
-

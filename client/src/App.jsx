@@ -1,10 +1,22 @@
 import { Activity, Mic2, Music2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { HarmoniumPage } from "./pages/HarmoniumPage.jsx";
+import { SargamPage } from "./pages/SargamPage.jsx";
+
+const ROUTES = {
+  "/harmonium": HarmoniumPage,
+  "/sargam": SargamPage
+};
 
 export default function App() {
   const [path, setPath] = useState(window.location.pathname);
   const activePath = useMemo(() => (path === "/" ? "/harmonium" : path), [path]);
+  const ActivePage = ROUTES[activePath] || HarmoniumPage;
+
+  function navigate(nextPath) {
+    window.history.pushState({}, "", nextPath);
+    setPath(nextPath);
+  }
 
   useEffect(() => {
     if (window.location.pathname === "/") {
@@ -51,7 +63,23 @@ export default function App() {
             <strong>Detect pitch</strong>
           </div>
         </section>
-        {activePath === "/harmonium" ? <HarmoniumPage /> : <HarmoniumPage />}
+        <nav className="mode-tabs" aria-label="Practice modes">
+          <button
+            className={activePath === "/harmonium" ? "active" : ""}
+            type="button"
+            onClick={() => navigate("/harmonium")}
+          >
+            Harmonium
+          </button>
+          <button
+            className={activePath === "/sargam" ? "active" : ""}
+            type="button"
+            onClick={() => navigate("/sargam")}
+          >
+            Sargam
+          </button>
+        </nav>
+        <ActivePage />
       </main>
     </div>
   );
