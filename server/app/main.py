@@ -34,7 +34,7 @@ async def analyze_note(file: UploadFile = File(...), target_note: str = Form(...
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
-    suffix = Path(file.filename or "recording.webm").suffix or ".webm"
+    suffix = Path(file.filename or "recording.wav").suffix or ".wav"
 
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
@@ -67,7 +67,7 @@ async def analyze_note(file: UploadFile = File(...), target_note: str = Form(...
     except Exception as error:
         raise HTTPException(
             status_code=500,
-            detail="Audio analysis failed. Make sure ffmpeg is installed for browser recordings.",
+            detail="Audio analysis failed. Upload a short 16-bit WAV recording and try again.",
         ) from error
     finally:
         if "temp_path" in locals() and temp_path.exists():

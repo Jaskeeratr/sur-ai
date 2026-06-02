@@ -1,6 +1,52 @@
 import { Square, Mic, Loader2 } from "lucide-react";
 import { useRef, useState } from "react";
 
+async function convertBlobToWav(blob) {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) {
+    throw new Error("This browser does not support audio processing.");
+  }
+
+  const audioContext = new AudioContext();
+  const arrayBuffer = await blob.arrayBuffer();
+  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+  await audioContext.close();
+
+  const sampleRate = audioBuffer.sampleRate;
+  const channelData = audioBuffer.getChannelData(0);
+  const wavBuffer = new ArrayBuffer(44 + channelData.length * 2);
+  const view = new DataView(wavBuffer);
+
+  function writeString(offset, value) {
+    for (let index = 0; index < value.length; index += 1) {
+      view.setUint8(offset + index, value.charCodeAt(index));
+    }
+  }
+
+  writeString(0, "RIFF");
+  view.setUint32(4, 36 + channelData.length * 2, true);
+  writeString(8, "WAVE");
+  writeString(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, "data");
+  view.setUint32(40, channelData.length * 2, true);
+
+  let offset = 44;
+  for (let index = 0; index < channelData.length; index += 1) {
+    const sample = Math.max(-1, Math.min(1, channelData[index]));
+    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+    offset += 2;
+  }
+
+  return new Blob([view], { type: "audio/wav" });
+}
+
 export function RecordingControls({ disabled, isAnalyzing, onRecordingReady }) {
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
@@ -25,11 +71,17 @@ export function RecordingControls({ disabled, isAnalyzing, onRecordingReady }) {
         }
       };
 
-      recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+      recorder.onstop = async () => {
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
         stream.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
-        onRecordingReady(blob);
+
+        try {
+          const wavBlob = await convertBlobToWav(blob);
+          onRecordingReady(wavBlob);
+        } catch (error) {
+          setRecordingError(error.message || "Could not prepare the recording for analysis.");
+        }
       };
 
       recorder.start();
@@ -83,4 +135,3 @@ export function RecordingControls({ disabled, isAnalyzing, onRecordingReady }) {
     </div>
   );
 }
-

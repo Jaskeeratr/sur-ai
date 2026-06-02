@@ -34,7 +34,7 @@ export function HarmoniumPage() {
     setAnalysis(null);
 
     const formData = new FormData();
-    formData.append("file", blob, "voice-recording.webm");
+    formData.append("file", blob, "voice-recording.wav");
     formData.append("target_note", selectedNote.note);
 
     try {
@@ -85,4 +85,3 @@ export function HarmoniumPage() {
     </div>
   );
 }
-
