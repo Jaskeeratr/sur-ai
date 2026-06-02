@@ -519,7 +519,45 @@ dd {
 }
 
 .graph-wrap {
-  min-height: 250px;
+  min-height: 280px;
+}
+
+.pitch-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 12px;
+}
+
+.pitch-summary div {
+  background: #f7f2e8;
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+}
+
+.pitch-summary span {
+  color: #5f6f66;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.pitch-summary strong {
+  color: #24312b;
+  font-size: 0.95rem;
+}
+
+.movement-rising {
+  color: #984126 !important;
+}
+
+.movement-falling {
+  color: #1f5f89 !important;
+}
+
+.movement-steady {
+  color: #155f4c !important;
 }
 
 .empty-graph {
@@ -613,6 +651,10 @@ dd {
 
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pitch-summary {
+    grid-template-columns: 1fr;
   }
 
   .harmonium-keyboard {
