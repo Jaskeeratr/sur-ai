@@ -7,7 +7,14 @@ import { RecordingControls } from "../components/RecordingControls.jsx";
 import { FeedbackCard } from "../components/FeedbackCard.jsx";
 import { PitchGraph } from "../components/PitchGraph.jsx";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+
+async function checkBackendHealth() {
+  const response = await fetch(`${API_BASE_URL}/health`, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Backend health check returned ${response.status}.`);
+  }
+}
 
 export function HarmoniumPage() {
   const [selectedNote, setSelectedNote] = useState(HARMONIUM_NOTES[0]);
@@ -38,6 +45,7 @@ export function HarmoniumPage() {
     formData.append("target_note", selectedNote.note);
 
     try {
+      await checkBackendHealth();
       const response = await fetch(`${API_BASE_URL}/analyze-note`, {
         method: "POST",
         body: formData
@@ -58,7 +66,7 @@ export function HarmoniumPage() {
         status: "request_failed",
         accuracy: 0,
         pitch_points: [],
-        feedback: `The backend could not be reached. ${error.message}`
+        feedback: `The backend could not be reached. Confirm FastAPI is running on port 8000, then reload the page. ${error.message}`
       });
     } finally {
       setIsAnalyzing(false);

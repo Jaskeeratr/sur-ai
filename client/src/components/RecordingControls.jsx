@@ -1,6 +1,30 @@
 import { Square, Mic, Loader2 } from "lucide-react";
 import { useRef, useState } from "react";
 
+const UPLOAD_SAMPLE_RATE = 16000;
+const MAX_RECORDING_SECONDS = 6;
+
+function resampleChannel(channelData, sourceRate, targetRate) {
+  if (sourceRate === targetRate) {
+    return channelData;
+  }
+
+  const outputLength = Math.max(1, Math.floor((channelData.length * targetRate) / sourceRate));
+  const output = new Float32Array(outputLength);
+  const ratio = sourceRate / targetRate;
+
+  for (let index = 0; index < outputLength; index += 1) {
+    const sourcePosition = index * ratio;
+    const sourceIndex = Math.floor(sourcePosition);
+    const fraction = sourcePosition - sourceIndex;
+    const current = channelData[sourceIndex] || 0;
+    const next = channelData[sourceIndex + 1] || current;
+    output[index] = current + (next - current) * fraction;
+  }
+
+  return output;
+}
+
 async function convertBlobToWav(blob) {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   if (!AudioContext) {
@@ -12,8 +36,16 @@ async function convertBlobToWav(blob) {
   const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
   await audioContext.close();
 
-  const sampleRate = audioBuffer.sampleRate;
-  const channelData = audioBuffer.getChannelData(0);
+  const sampleRate = UPLOAD_SAMPLE_RATE;
+  const maxSamples = Math.min(
+    audioBuffer.length,
+    Math.floor(audioBuffer.sampleRate * MAX_RECORDING_SECONDS)
+  );
+  const channelData = resampleChannel(
+    audioBuffer.getChannelData(0).slice(0, maxSamples),
+    audioBuffer.sampleRate,
+    sampleRate
+  );
   const wavBuffer = new ArrayBuffer(44 + channelData.length * 2);
   const view = new DataView(wavBuffer);
 

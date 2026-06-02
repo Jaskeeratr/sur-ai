@@ -6,24 +6,34 @@ import { RecordingControls } from "../components/RecordingControls.jsx";
 import { FeedbackCard } from "../components/FeedbackCard.jsx";
 import { SelectedNoteCard } from "../components/SelectedNoteCard.jsx";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+
+async function checkBackendHealth() {
+  const response = await fetch(`${API_BASE_URL}/health`, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Backend health check returned ${response.status}.`);
+  }
+}
 
 export function SargamPage() {
-  const [root, setRoot] = useState("C");
+  const [rootOption, setRootOption] = useState(ROOT_OPTIONS[0]);
   const [stepIndex, setStepIndex] = useState(0);
   const [results, setResults] = useState([]);
   const [analysis, setAnalysis] = useState(null);
   const [analysisError, setAnalysisError] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const scale = useMemo(() => buildSargamScale(root), [root]);
+  const scale = useMemo(
+    () => buildSargamScale(rootOption.value, rootOption.octave),
+    [rootOption]
+  );
   const selectedNote = scale[stepIndex];
   const sessionScore = results.length
     ? Math.round(results.reduce((sum, result) => sum + result.accuracy, 0) / results.length)
     : 0;
 
-  function resetSession(nextRoot = root) {
-    setRoot(nextRoot);
+  function resetSession(nextRootOption = rootOption) {
+    setRootOption(nextRootOption);
     setStepIndex(0);
     setResults([]);
     setAnalysis(null);
@@ -40,6 +50,7 @@ export function SargamPage() {
     formData.append("target_note", selectedNote.note);
 
     try {
+      await checkBackendHealth();
       const response = await fetch(`${API_BASE_URL}/analyze-note`, {
         method: "POST",
         body: formData
@@ -76,7 +87,7 @@ export function SargamPage() {
         status: "request_failed",
         accuracy: 0,
         pitch_points: [],
-        feedback: `The backend could not be reached. ${error.message}`
+        feedback: `The backend could not be reached. Confirm FastAPI is running on port 8000, then reload the page. ${error.message}`
       });
     } finally {
       setIsAnalyzing(false);
@@ -94,12 +105,12 @@ export function SargamPage() {
           <div className="root-selector" aria-label="Root Sa">
             {ROOT_OPTIONS.map((option) => (
               <button
-                className={option === root ? "selected" : ""}
-                key={option}
+                className={option.label === rootOption.label && option.octave === rootOption.octave ? "selected" : ""}
+                key={`${option.value}${option.octave}`}
                 type="button"
                 onClick={() => resetSession(option)}
               >
-                {option}
+                {option.label}
               </button>
             ))}
           </div>

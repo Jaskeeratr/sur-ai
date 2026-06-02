@@ -6,13 +6,13 @@ export function HarmoniumKeyboard({ notes, selectedNote, onSelect }) {
         <h3>Harmonium keyboard</h3>
       </div>
       <div className="harmonium-keyboard" role="list" aria-label="Harmonium notes">
-        {notes.map((note) => {
+        {notes.map((note, index) => {
           const isSelected = selectedNote.note === note.note;
 
           return (
             <button
               className={`harmonium-key ${isSelected ? "selected" : ""}`}
-              key={note.note}
+              key={`${note.note}-${note.sargam}-${index}`}
               type="button"
               onClick={() => onSelect(note)}
               aria-pressed={isSelected}
@@ -27,4 +27,3 @@ export function HarmoniumKeyboard({ notes, selectedNote, onSelect }) {
     </div>
   );
 }
-

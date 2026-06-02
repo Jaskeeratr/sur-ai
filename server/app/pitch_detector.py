@@ -2,9 +2,9 @@ import math
 import wave
 from pathlib import Path
 
-MIN_VOICE_FREQUENCY = 75.0
+MIN_VOICE_FREQUENCY = 65.0
 MAX_VOICE_FREQUENCY = 1100.0
-TARGET_SAMPLE_RATE = 16000
+TARGET_SAMPLE_RATE = 8000
 
 
 def _read_wav_mono(file_path: Path) -> tuple[list[float], int]:
@@ -188,8 +188,8 @@ def _estimate_frequency_autocorrelation(frame: list[float], sample_rate: int) ->
 
 
 def _build_frames(samples: list[float], sample_rate: int) -> tuple[list[tuple[float, list[float]]], list[float]]:
-    frame_length = min(4096, max(1024, int(sample_rate * 0.11)))
-    hop_length = max(256, int(sample_rate * 0.02))
+    frame_length = min(2048, max(1024, int(sample_rate * 0.14)))
+    hop_length = max(160, int(sample_rate * 0.03))
     frames: list[tuple[float, list[float]]] = []
     rms_values: list[float] = []
 
