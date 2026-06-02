@@ -1,4 +1,4 @@
-import { CheckCircle2, Gauge, Music, SlidersHorizontal } from "lucide-react";
+import { BrainCircuit, CheckCircle2, Gauge, Music, SlidersHorizontal, Waves } from "lucide-react";
 
 function formatSignedCents(value) {
   if (value == null) {
@@ -58,6 +58,30 @@ export function FeedbackCard({ analysis, isAnalyzing }) {
         </div>
       </div>
       <p className="feedback-text">{analysis.feedback}</p>
+      <div className="stability-panel">
+        <div className="stability-header">
+          <BrainCircuit size={18} aria-hidden="true" />
+          <div>
+            <span>AI vocal stability</span>
+            <strong>{analysis.stability_label ? analysis.stability_label.replace("_", " ") : "pending"}</strong>
+          </div>
+          <em>{analysis.model_source || "analysis"}</em>
+        </div>
+        <div className="stability-meter" aria-label="Vocal stability score">
+          <span style={{ width: `${Math.max(0, Math.min(100, analysis.stability || 0))}%` }} />
+        </div>
+        <div className="stability-meta">
+          <span>
+            <Gauge size={15} aria-hidden="true" />
+            {Math.round(analysis.stability || 0)}% stable
+          </span>
+          <span>
+            <Waves size={15} aria-hidden="true" />
+            {analysis.stability_features?.drift ?? 0} cents drift
+          </span>
+        </div>
+        <p className="feedback-text">{analysis.ai_feedback}</p>
+      </div>
     </div>
   );
 }

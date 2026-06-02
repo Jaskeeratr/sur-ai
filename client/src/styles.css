@@ -518,6 +518,70 @@ dd {
   margin: 16px 0 0;
 }
 
+.stability-panel {
+  border-top: 1px solid #e1d7c6;
+  margin-top: 18px;
+  padding-top: 16px;
+}
+
+.stability-header {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto 1fr auto;
+}
+
+.stability-header span,
+.stability-meta span {
+  color: #5f6f66;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.stability-header strong {
+  color: #24312b;
+  display: block;
+  font-size: 1.05rem;
+  text-transform: capitalize;
+}
+
+.stability-header em {
+  background: #edf7f2;
+  border-radius: 999px;
+  color: #155f4c;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 850;
+  padding: 5px 8px;
+  text-transform: uppercase;
+}
+
+.stability-meter {
+  background: #efe7d8;
+  border-radius: 999px;
+  height: 10px;
+  margin: 13px 0 10px;
+  overflow: hidden;
+}
+
+.stability-meter span {
+  background: linear-gradient(90deg, #b54b35, #f2c879, #1f6f5b);
+  display: block;
+  height: 100%;
+}
+
+.stability-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.stability-meta span {
+  align-items: center;
+  display: inline-flex;
+  gap: 5px;
+}
+
 .graph-wrap {
   min-height: 280px;
 }

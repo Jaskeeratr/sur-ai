@@ -5,6 +5,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.feedback_engine import compare_pitch
+from app.ml_model import analyze_stability
 from app.note_mapper import cents_between, frequency_to_note, get_target_frequency
 from app.pitch_detector import detect_pitch_points
 
@@ -43,6 +44,18 @@ def _no_pitch_response(target_note: str, target_frequency: float, detail: str) -
         "status": "no_pitch",
         "accuracy": 0,
         "feedback": detail,
+        "stability": 0,
+        "stability_label": "off_pitch",
+        "stability_confidence": 0,
+        "ai_feedback": "No stable pitch contour was available for vocal stability analysis.",
+        "model_source": "unavailable",
+        "stability_features": {
+            "average_cents": 0,
+            "cents_std": 0,
+            "drift": 0,
+            "average_step_change": 0,
+            "voiced_frames": 0,
+        },
     }
 
 
@@ -64,6 +77,7 @@ async def analyze_note(file: UploadFile = File(...), target_note: str = Form(...
         average_frequency = detection["average_frequency"]
         detected_note = frequency_to_note(average_frequency)
         comparison = compare_pitch(average_frequency, target_frequency)
+        stability = analyze_stability(detection["pitch_points"], target_frequency)
 
         pitch_points = [
             {
@@ -86,6 +100,7 @@ async def analyze_note(file: UploadFile = File(...), target_note: str = Form(...
             "voiced_frame_count": detection.get("voiced_frame_count", len(pitch_points)),
             "pitch_points": pitch_points,
             **comparison,
+            **stability,
         }
     except ValueError as error:
         return _no_pitch_response(target_note, target_frequency, str(error))
