@@ -11,7 +11,7 @@ def _frequency_for(note_name: str, octave: int) -> float:
 
 NOTE_FREQUENCIES = {
     f"{note_name}{octave}": _frequency_for(note_name, octave)
-    for octave in range(3, 7)
+    for octave in range(2, 8)
     for note_name in _NOTE_NAMES
 }
 

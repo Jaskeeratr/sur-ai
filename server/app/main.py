@@ -59,6 +59,8 @@ async def analyze_note(file: UploadFile = File(...), target_note: str = Form(...
             "target_frequency": target_frequency,
             "average_frequency": round(average_frequency, 2),
             "detected_note": detected_note,
+            "duration": round(detection.get("duration", 0), 2),
+            "voiced_frame_count": detection.get("voiced_frame_count", len(pitch_points)),
             "pitch_points": pitch_points,
             **comparison,
         }
