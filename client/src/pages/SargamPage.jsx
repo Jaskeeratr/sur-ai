@@ -9,6 +9,10 @@ import { SaCalibrationCard } from "../components/SaCalibrationCard.jsx";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
+function buildBackendError(error) {
+  return `The backend could not be reached at ${API_BASE_URL}. Check the deployed API URL and CORS allowed origins, then reload the page. ${error.message}`;
+}
+
 async function checkBackendHealth() {
   const response = await fetch(`${API_BASE_URL}/health`, { cache: "no-store" });
   if (!response.ok) {
@@ -96,7 +100,7 @@ export function SargamPage() {
         status: "request_failed",
         accuracy: 0,
         pitch_points: [],
-        feedback: `The backend could not be reached. Confirm FastAPI is running on port 8000, then reload the page. ${error.message}`
+        feedback: buildBackendError(error)
       });
     } finally {
       setIsAnalyzing(false);
@@ -148,7 +152,7 @@ export function SargamPage() {
         suggested_note: null,
         suggested_frequency: null,
         cents_from_suggested: null,
-        feedback: `The backend could not be reached. Confirm FastAPI is running on port 8000, then reload the page. ${error.message}`
+        feedback: buildBackendError(error)
       });
     } finally {
       setIsCalibrating(false);

@@ -21,7 +21,7 @@ DEFAULT_ALLOWED_ORIGINS = [
 def _get_allowed_origins() -> list[str]:
     configured_origins = os.getenv("ALLOWED_ORIGINS", "")
     origins = [
-        origin.strip()
+        origin.strip().rstrip("/")
         for origin in configured_origins.split(",")
         if origin.strip()
     ]
