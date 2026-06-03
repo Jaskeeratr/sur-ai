@@ -1,10 +1,10 @@
 # SurSadhana AI
 
-SurSadhana AI is a full-stack singing practice app that helps vocalists match their voice to harmonium and sargam notes. The app plays a harmonium-style reference key, records the singer, extracts the pitch contour on a FastAPI backend, compares the voice against the selected target note, and returns accuracy, cents offset, pitch drift, and AI-style vocal stability feedback.
+SurSadhana AI is a full-stack singing practice app that helps vocalists match their voice to harmonium and sargam notes. The app plays a harmonium-style reference key, records the singer, extracts the pitch contour on a FastAPI backend, compares the voice against the selected target note, and returns accuracy, cents offset, pitch drift, and vocal stability feedback.
 
 ## Why This Project Matters
 
-This project combines frontend product design, backend API engineering, browser audio recording, signal processing, data visualization, and an optional PyTorch vocal stability model. It is designed as a portfolio-quality AI/audio project rather than a generic CRUD app.
+This project combines frontend product design, backend API engineering, browser audio recording, signal processing, and data visualization. It is designed as a portfolio-quality audio analysis project rather than a generic CRUD app.
 
 ## Features
 
@@ -20,15 +20,15 @@ This project combines frontend product design, backend API engineering, browser 
 - Recorded pitch movement graph with target line, average line, high/low range, and rising/falling/steady drift
 - Sargam practice mode with selectable root Sa
 - Vocal stability classification: `stable`, `shaky`, `sharp_drift`, `flat_drift`, `off_pitch`
-- Optional PyTorch training pipeline using synthetic pitch-contour data
-- Heuristic fallback when a trained PyTorch model is not installed
+- Heuristic vocal stability analysis from cents deviation, wobble, drift, and voiced-frame features
+- Pitch detection benchmark script for reporting note accuracy, cents error, and backend analysis latency
 
 ## Tech Stack
 
 - Frontend: React, Vite, Recharts, Lucide icons
 - Backend: FastAPI, Python standard-library WAV processing
 - Audio analysis: custom YIN-style pitch detector and cents-based note matching
-- ML: optional PyTorch stability classifier with deterministic fallback
+- Stability analysis: deterministic feature-based classifier
 
 ## Architecture
 
@@ -72,9 +72,8 @@ server/
   app/main.py            FastAPI app
   app/pitch_detector.py  WAV reading and pitch contour detection
   app/feedback_engine.py cents feedback and accuracy
-  app/ml_model.py        stability feature extraction and model/fallback inference
-  app/stability_network.py PyTorch model definition
-  training/              synthetic dataset and training script
+  app/ml_model.py        stability feature extraction and heuristic classification
+  benchmarks/            pitch detection accuracy and latency benchmark
 ```
 
 ## Run Locally
@@ -250,24 +249,42 @@ Example response:
 }
 ```
 
-## Optional PyTorch Stability Model
+## Pitch Detection Benchmark
 
-The app works without PyTorch by using the same extracted features with a deterministic fallback classifier. To train and use the PyTorch model:
+Run the benchmark from the backend directory:
 
 ```bash
 cd server
 .venv\Scripts\activate
-python -m pip install -r requirements-ml.txt
-python training/train_stability_model.py
+python benchmarks/pitch_detection_benchmark.py --output-json benchmark_reports/latest.json --output-csv benchmark_reports/latest.csv
 ```
 
-This creates:
+The benchmark generates controlled 2-second WAV samples across two octaves, small cents offsets, and light noise levels. It runs the same `detect_pitch_points` function used by the API and reports:
+
+- note detection accuracy
+- successful detection count
+- mean and median absolute cents error
+- average and p95 analysis latency
+
+Benchmark numbers should be described as synthetic test results unless they are later collected from real user recordings.
+
+Current local synthetic benchmark:
 
 ```text
-server/models/stability_model.pt
+Recordings: 96 controlled 2-second WAV samples
+Successful detections: 96 / 96
+Note detection accuracy: 100.00%
+Mean absolute cents error: 1.83 cents
+Median absolute cents error: 1.65 cents
+Average analysis latency: 717.36 ms
+P95 analysis latency: 826.40 ms
 ```
 
-The file is intentionally ignored by Git because model binaries can become large. When present, `/analyze-note` loads the PyTorch model and returns `model_source: "pytorch"`.
+Resume-safe wording:
+
+```text
+Benchmarked custom pitch detector at 100% note detection accuracy across 96 controlled synthetic vocal-tone recordings, with 1.83-cent mean absolute error and 717 ms average backend analysis latency.
+```
 
 ## Demo Flow
 
@@ -281,10 +298,10 @@ The file is intentionally ignored by Git because model binaries can become large
 
 ## Resume Summary
 
-Built SurSadhana AI, a full-stack audio ML singing practice app using React and FastAPI that records vocals, detects pitch contours, compares performance against harmonium and sargam target notes, visualizes pitch drift over time, and classifies vocal stability using a PyTorch-ready feature pipeline.
+Built SurSadhana AI, a full-stack audio analysis singing practice app using React and FastAPI that records vocals, detects pitch contours, compares performance against harmonium and sargam target notes, visualizes pitch drift over time, and classifies vocal stability with deterministic signal-processing features.
 
 ## Known Limitations
 
 - The current pitch detector is optimized for short held notes, not full song transcription.
-- The PyTorch classifier starts with synthetic training data and should be improved with labeled real vocal recordings.
+- Vocal stability labels are heuristic and should be validated with labeled real vocal recordings before being described as a trained ML model.
 - Browser microphone quality and background noise can affect pitch detection.

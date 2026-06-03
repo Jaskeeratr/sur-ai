@@ -1,7 +1,5 @@
 import math
-from pathlib import Path
 
-MODEL_PATH = Path(__file__).resolve().parents[1] / "models" / "stability_model.pt"
 LABELS = ["stable", "shaky", "sharp_drift", "flat_drift", "off_pitch"]
 
 
@@ -109,60 +107,9 @@ def _heuristic_stability(features: dict) -> dict:
     }
 
 
-def _torch_prediction(features: dict) -> dict | None:
-    try:
-        import torch
-    except ImportError:
-        return None
-
-    if not MODEL_PATH.exists():
-        return None
-
-    checkpoint = torch.load(MODEL_PATH, map_location="cpu")
-    model_state = checkpoint.get("model_state")
-    if not model_state:
-        return None
-
-    from app.stability_network import StabilityNet
-
-    model = StabilityNet()
-    model.load_state_dict(model_state)
-    model.eval()
-
-    feature_vector = torch.tensor(
-        [
-            features["average_cents"] / 100,
-            features["absolute_average_cents"] / 100,
-            features["cents_std"] / 100,
-            features["average_step_change"] / 100,
-            features["drift"] / 100,
-            features["slope"] / 30,
-            features["pitch_variance"] / 30,
-            min(features["note_duration"], 6) / 6,
-        ],
-        dtype=torch.float32,
-    ).unsqueeze(0)
-
-    with torch.no_grad():
-        logits = model(feature_vector)
-        probabilities = torch.softmax(logits, dim=1).squeeze(0)
-        confidence, index = torch.max(probabilities, dim=0)
-
-    heuristic = _heuristic_stability(features)
-    label = LABELS[int(index)]
-    return {
-        **heuristic,
-        "stability_label": label,
-        "stability_confidence": round(float(confidence), 2),
-        "model_source": "pytorch",
-    }
-
-
 def analyze_stability(pitch_points: list[dict], target_frequency: float) -> dict:
     features = extract_stability_features(pitch_points, target_frequency)
-    prediction = _torch_prediction(features)
-    if prediction is None:
-        prediction = _heuristic_stability(features)
+    prediction = _heuristic_stability(features)
 
     return {
         **prediction,

@@ -15,4 +15,4 @@ venv/
 *.mp4
 *.mov
 server/models/*.pt
-
+server/benchmark_reports/
