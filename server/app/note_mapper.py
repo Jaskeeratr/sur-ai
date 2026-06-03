@@ -28,7 +28,7 @@ SARGAM_LABELS = {
 
 
 def get_target_frequency(note: str) -> float:
-    normalized = note.strip().upper().replace("♯", "#")
+    normalized = note.strip().upper().replace("\u266f", "#")
     if normalized not in NOTE_FREQUENCIES:
         supported = ", ".join(NOTE_FREQUENCIES)
         raise ValueError(f"Unsupported target note '{note}'. Supported notes: {supported}.")
