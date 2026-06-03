@@ -47,6 +47,13 @@ def sine_wave(frequency: float, seconds: float = 2.0, sample_rate: int = 16000, 
     ]
 
 
+def clipped_sine_wave(frequency: float, seconds: float = 2.0, sample_rate: int = 16000):
+    return [
+        max(-1.0, min(1.0, 1.8 * math.sin(2 * math.pi * frequency * index / sample_rate)))
+        for index in range(int(seconds * sample_rate))
+    ]
+
+
 def test_read_wav_mono_averages_stereo_channels(tmp_path):
     path = tmp_path / "stereo.wav"
     write_wav(path, [(0.5, -0.5)] * 1600, channels=2)
@@ -120,3 +127,40 @@ def test_detect_pitch_points_handles_stereo_voice_input(tmp_path):
     result = detect_pitch_points(path)
 
     assert result["average_frequency"] == pytest.approx(261.63, abs=2.0)
+
+
+def test_detect_pitch_points_handles_clipped_input(tmp_path):
+    path = tmp_path / "clipped.wav"
+    write_wav(path, clipped_sine_wave(329.63))
+
+    result = detect_pitch_points(path)
+
+    assert result["average_frequency"] == pytest.approx(329.63, abs=3.0)
+
+
+def test_detect_pitch_points_handles_low_supported_voice_frequency(tmp_path):
+    path = tmp_path / "low-c2.wav"
+    write_wav(path, sine_wave(65.41, amplitude=0.5))
+
+    result = detect_pitch_points(path)
+
+    assert result["average_frequency"] == pytest.approx(65.41, abs=1.5)
+
+
+def test_detect_pitch_points_handles_high_supported_voice_frequency(tmp_path):
+    path = tmp_path / "high-c6.wav"
+    write_wav(path, sine_wave(1046.5, amplitude=0.35))
+
+    result = detect_pitch_points(path)
+
+    assert result["average_frequency"] == pytest.approx(1046.5, abs=8.0)
+
+
+def test_detect_pitch_points_resolves_borderline_between_a4_and_a_sharp4(tmp_path):
+    path = tmp_path / "borderline.wav"
+    frequency = math.sqrt(440.0 * 466.16) * 0.997
+    write_wav(path, sine_wave(frequency))
+
+    result = detect_pitch_points(path)
+
+    assert result["average_frequency"] == pytest.approx(frequency, abs=2.0)

@@ -6,6 +6,11 @@ SurSadhana AI is a full-stack singing practice app that helps vocalists match th
 
 This project combines frontend product design, backend API engineering, browser audio recording, signal processing, and data visualization. It is designed as a portfolio-quality audio analysis project rather than a generic CRUD app.
 
+## Live Demo
+
+- Frontend: https://sur-ai.vercel.app
+- Backend health check: https://sursadhana-ai-api.onrender.com/health
+
 ## Features
 
 - Playable harmonium keyboard from `C3` to `B5`
@@ -22,6 +27,7 @@ This project combines frontend product design, backend API engineering, browser 
 - Vocal stability classification: `stable`, `shaky`, `sharp_drift`, `flat_drift`, `off_pitch`
 - Heuristic vocal stability analysis from cents deviation, wobble, drift, and voiced-frame features
 - Pitch detection benchmark script for reporting note accuracy, cents error, and backend analysis latency
+- GitHub Actions CI for backend tests and frontend production builds
 
 ## Tech Stack
 
@@ -268,6 +274,24 @@ The benchmark generates controlled 2-second WAV samples across two octaves, smal
 
 Benchmark numbers should be described as synthetic test results unless they are later collected from real user recordings.
 
+To benchmark real vocal recordings, collect `.wav` files in a folder and include the expected note in each filename:
+
+```text
+real_recordings/
+  Csharp3_sa_01.wav
+  D3_re_01.wav
+  E3_ga_01.wav
+  G3_pa_01.wav
+```
+
+Then run:
+
+```bash
+python benchmarks/pitch_detection_benchmark.py --recordings-dir real_recordings --output-json benchmark_reports/real.json --output-csv benchmark_reports/real.csv
+```
+
+The script infers labels such as `Csharp3`, `C#3`, `D3`, and `A4` from filenames, then reports note accuracy, cents error, and latency using the same detector as the API.
+
 Current local synthetic benchmark:
 
 ```text
@@ -305,3 +329,16 @@ Built SurSadhana AI, a full-stack audio analysis singing practice app using Reac
 - The current pitch detector is optimized for short held notes, not full song transcription.
 - Vocal stability labels are heuristic and should be validated with labeled real vocal recordings before being described as a trained ML model.
 - Browser microphone quality and background noise can affect pitch detection.
+
+## Quality Checks
+
+Backend tests and frontend builds run in GitHub Actions on every push and pull request. Run the same checks locally:
+
+```bash
+cd server
+.venv\Scripts\activate
+python -m pytest tests
+
+cd ../client
+npm run build
+```

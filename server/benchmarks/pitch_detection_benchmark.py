@@ -2,6 +2,7 @@ import argparse
 import csv
 import json
 import math
+import re
 import statistics
 import tempfile
 import time
@@ -42,6 +43,25 @@ DEFAULT_NOTES = [
     "A#4",
     "B4",
 ]
+
+NOTE_PATTERN = re.compile(r"([A-G](?:#|sharp)?[2-7])", re.IGNORECASE)
+
+
+def _normalize_note_name(value: str) -> str:
+    return value.upper().replace("SHARP", "#")
+
+
+def _expected_note_from_path(path: Path) -> str:
+    match = NOTE_PATTERN.search(path.stem)
+    if not match:
+        raise ValueError(
+            f"Could not infer expected note from '{path.name}'. "
+            "Name real benchmark files like Csharp3_sample01.wav, C#3_01.wav, or A4-held.wav."
+        )
+    note = _normalize_note_name(match.group(1))
+    if note not in NOTE_FREQUENCIES:
+        raise ValueError(f"Unsupported note '{note}' inferred from '{path.name}'.")
+    return note
 
 
 def _detuned_frequency(base_frequency: float, cents: float) -> float:
@@ -84,7 +104,64 @@ def _write_wav(path: Path, frequency: float, seconds: float, sample_rate: int, n
         wav_file.writeframes(bytes(frames))
 
 
-def run_benchmark(
+def _summarize_rows(rows: list[dict]) -> dict:
+    successful_rows = [row for row in rows if row["status"] == "ok"]
+    correct_rows = [row for row in successful_rows if row["correct_note"]]
+    cents_errors = [
+        row["absolute_cents_error"]
+        for row in successful_rows
+        if row["absolute_cents_error"] is not None
+    ]
+    latencies = [row["latency_ms"] for row in rows]
+
+    return {
+        "recording_count": len(rows),
+        "successful_detections": len(successful_rows),
+        "note_accuracy_percent": round((len(correct_rows) / len(rows)) * 100, 2) if rows else 0,
+        "mean_absolute_cents_error": round(statistics.mean(cents_errors), 2) if cents_errors else None,
+        "median_absolute_cents_error": round(statistics.median(cents_errors), 2) if cents_errors else None,
+        "average_latency_ms": round(statistics.mean(latencies), 2) if latencies else None,
+        "p95_latency_ms": round(
+            statistics.quantiles(latencies, n=20, method="inclusive")[18], 2
+        )
+        if len(latencies) >= 20
+        else None,
+    }
+
+
+def _analyze_recording(path: Path, expected_note: str, expected_frequency: float | None = None) -> dict:
+    expected_frequency = expected_frequency or NOTE_FREQUENCIES[expected_note]
+    started = time.perf_counter()
+    try:
+        result = detect_pitch_points(path)
+        latency_ms = (time.perf_counter() - started) * 1000
+        detected_frequency = result["average_frequency"]
+        detected_note = frequency_to_note(detected_frequency)
+        absolute_cents_error = abs(cents_between(detected_frequency, expected_frequency))
+        status = "ok"
+    except Exception as error:
+        latency_ms = (time.perf_counter() - started) * 1000
+        detected_frequency = None
+        detected_note = None
+        absolute_cents_error = None
+        status = f"failed: {error}"
+
+    return {
+        "file": path.name,
+        "expected_note": expected_note,
+        "expected_frequency": round(expected_frequency, 3),
+        "detected_note": detected_note,
+        "detected_frequency": round(detected_frequency, 3) if detected_frequency else None,
+        "absolute_cents_error": round(absolute_cents_error, 3)
+        if absolute_cents_error is not None
+        else None,
+        "latency_ms": round(latency_ms, 3),
+        "status": status,
+        "correct_note": detected_note == expected_note,
+    }
+
+
+def run_synthetic_benchmark(
     seconds: float = 2.0,
     sample_rate: int = 16000,
     cents_offsets: tuple[int, ...] = (-8, 8),
@@ -101,63 +178,31 @@ def run_benchmark(
                     wav_path = temp_path / f"{note.replace('#', 'sharp')}_{cents_offset}_{noise_level}.wav"
                     _write_wav(wav_path, expected_frequency, seconds, sample_rate, noise_level)
 
-                    started = time.perf_counter()
-                    try:
-                        result = detect_pitch_points(wav_path)
-                        latency_ms = (time.perf_counter() - started) * 1000
-                        detected_frequency = result["average_frequency"]
-                        detected_note = frequency_to_note(detected_frequency)
-                        absolute_cents_error = abs(cents_between(detected_frequency, expected_frequency))
-                        status = "ok"
-                    except Exception as error:
-                        latency_ms = (time.perf_counter() - started) * 1000
-                        detected_frequency = None
-                        detected_note = None
-                        absolute_cents_error = None
-                        status = f"failed: {error}"
+                    row = _analyze_recording(wav_path, note, expected_frequency)
+                    row["cents_offset"] = cents_offset
+                    row["noise_level"] = noise_level
+                    rows.append(row)
 
-                    rows.append(
-                        {
-                            "expected_note": note,
-                            "expected_frequency": round(expected_frequency, 3),
-                            "cents_offset": cents_offset,
-                            "noise_level": noise_level,
-                            "detected_note": detected_note,
-                            "detected_frequency": round(detected_frequency, 3) if detected_frequency else None,
-                            "absolute_cents_error": round(absolute_cents_error, 3)
-                            if absolute_cents_error is not None
-                            else None,
-                            "latency_ms": round(latency_ms, 3),
-                            "status": status,
-                            "correct_note": detected_note == note,
-                        }
-                    )
+    return {"summary": _summarize_rows(rows), "rows": rows}
 
-    successful_rows = [row for row in rows if row["status"] == "ok"]
-    correct_rows = [row for row in successful_rows if row["correct_note"]]
-    cents_errors = [row["absolute_cents_error"] for row in successful_rows]
-    latencies = [row["latency_ms"] for row in rows]
 
-    summary = {
-        "recording_count": len(rows),
-        "successful_detections": len(successful_rows),
-        "note_accuracy_percent": round((len(correct_rows) / len(rows)) * 100, 2) if rows else 0,
-        "mean_absolute_cents_error": round(statistics.mean(cents_errors), 2) if cents_errors else None,
-        "median_absolute_cents_error": round(statistics.median(cents_errors), 2) if cents_errors else None,
-        "average_latency_ms": round(statistics.mean(latencies), 2) if latencies else None,
-        "p95_latency_ms": round(
-            statistics.quantiles(latencies, n=20, method="inclusive")[18], 2
-        )
-        if len(latencies) >= 20
-        else None,
-    }
+def run_real_recording_benchmark(recordings_dir: Path) -> dict:
+    wav_files = sorted(recordings_dir.rglob("*.wav"))
+    if not wav_files:
+        raise ValueError(f"No .wav files found in {recordings_dir}.")
 
-    return {"summary": summary, "rows": rows}
+    rows = []
+    for wav_path in wav_files:
+        expected_note = _expected_note_from_path(wav_path)
+        rows.append(_analyze_recording(wav_path, expected_note))
+
+    return {"summary": _summarize_rows(rows), "rows": rows}
 
 
 def _write_csv(path: Path, rows: list[dict]) -> None:
     with path.open("w", newline="", encoding="utf-8") as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=list(rows[0].keys()))
+        fieldnames = sorted({key for row in rows for key in row})
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
 
@@ -166,6 +211,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Benchmark SurSadhana pitch detection accuracy and latency.")
     parser.add_argument("--seconds", type=float, default=2.0)
     parser.add_argument("--sample-rate", type=int, default=16000)
+    parser.add_argument(
+        "--recordings-dir",
+        type=Path,
+        default=None,
+        help="Directory of real labeled WAV files. Expected note is inferred from each filename.",
+    )
     parser.add_argument(
         "--cents-offsets",
         default="-8,8",
@@ -180,12 +231,15 @@ def main() -> None:
     parser.add_argument("--output-csv", type=Path, default=None)
     args = parser.parse_args()
 
-    report = run_benchmark(
-        seconds=args.seconds,
-        sample_rate=args.sample_rate,
-        cents_offsets=tuple(int(value) for value in args.cents_offsets.split(",") if value),
-        noise_levels=tuple(float(value) for value in args.noise_levels.split(",") if value),
-    )
+    if args.recordings_dir:
+        report = run_real_recording_benchmark(args.recordings_dir)
+    else:
+        report = run_synthetic_benchmark(
+            seconds=args.seconds,
+            sample_rate=args.sample_rate,
+            cents_offsets=tuple(int(value) for value in args.cents_offsets.split(",") if value),
+            noise_levels=tuple(float(value) for value in args.noise_levels.split(",") if value),
+        )
     print(json.dumps(report["summary"], indent=2))
 
     if args.output_json:
