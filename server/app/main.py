@@ -86,6 +86,15 @@ def _no_calibration_pitch_response(detail: str) -> dict:
     }
 
 
+def _average_frequency(points: list[dict]) -> float | None:
+    if not points:
+        return None
+    confidence_total = sum(point.get("confidence", 1) for point in points)
+    if confidence_total <= 0:
+        return sum(point["frequency"] for point in points) / len(points)
+    return sum(point["frequency"] * point.get("confidence", 1) for point in points) / confidence_total
+
+
 @app.post("/analyze-note")
 async def analyze_note(file: UploadFile = File(...), target_note: str = Form(...)):
     try:
@@ -135,6 +144,119 @@ async def analyze_note(file: UploadFile = File(...), target_note: str = Form(...
         raise HTTPException(
             status_code=500,
             detail="Audio analysis failed. Upload a short 16-bit WAV recording and try again.",
+        ) from error
+    finally:
+        if "temp_path" in locals() and temp_path.exists():
+            temp_path.unlink()
+
+
+@app.post("/analyze-sequence")
+async def analyze_sequence(file: UploadFile = File(...), target_notes: str = Form(...)):
+    notes = [note.strip().upper() for note in target_notes.split(",") if note.strip()]
+    if not notes:
+        raise HTTPException(status_code=400, detail="Provide at least one target note.")
+
+    try:
+        target_frequencies = [get_target_frequency(note) for note in notes]
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+    suffix = Path(file.filename or "sequence.wav").suffix or ".wav"
+
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
+            temp_audio.write(await file.read())
+            temp_path = Path(temp_audio.name)
+
+        detection = detect_pitch_points(temp_path, filter_stable=False)
+        duration = detection.get("duration", 0)
+        pitch_points = detection["pitch_points"]
+        segment_duration = duration / len(notes) if notes else duration
+        segments = []
+
+        for index, note in enumerate(notes):
+            start_time = index * segment_duration
+            end_time = duration if index == len(notes) - 1 else (index + 1) * segment_duration
+            transition_padding = min(0.09, segment_duration * 0.2)
+            scoring_start = start_time + (transition_padding if index > 0 else 0)
+            scoring_end = end_time - (transition_padding if index < len(notes) - 1 else 0)
+            segment_points = [
+                point
+                for point in pitch_points
+                if scoring_start <= point["time"] < scoring_end
+            ]
+            average_frequency = _average_frequency(segment_points)
+            target_frequency = target_frequencies[index]
+
+            if average_frequency is None:
+                segments.append(
+                    {
+                        "step": index + 1,
+                        "target_note": note,
+                        "target_frequency": target_frequency,
+                        "start_time": round(start_time, 2),
+                        "end_time": round(end_time, 2),
+                        "average_frequency": None,
+                        "detected_note": None,
+                        "status": "no_pitch",
+                        "accuracy": 0,
+                        "cents_off": None,
+                        "feedback": "No stable pitch was detected for this note.",
+                        "voiced_frame_count": 0,
+                    }
+                )
+                continue
+
+            comparison = compare_pitch(average_frequency, target_frequency)
+            segments.append(
+                {
+                    "step": index + 1,
+                    "target_note": note,
+                    "target_frequency": target_frequency,
+                    "start_time": round(start_time, 2),
+                    "end_time": round(end_time, 2),
+                    "average_frequency": round(average_frequency, 2),
+                    "detected_note": frequency_to_note(average_frequency),
+                    "voiced_frame_count": len(segment_points),
+                    **comparison,
+                }
+            )
+
+        scored_segments = [segment for segment in segments if segment["status"] != "no_pitch"]
+        sequence_accuracy = (
+            round(sum(segment["accuracy"] for segment in scored_segments) / len(scored_segments))
+            if scored_segments
+            else 0
+        )
+
+        return {
+            "analysis_status": detection.get("analysis_status", "pitch_detected"),
+            "duration": round(duration, 2),
+            "target_notes": notes,
+            "sequence_accuracy": sequence_accuracy,
+            "segments": segments,
+            "pitch_points": [
+                {
+                    **point,
+                    "detected_note": frequency_to_note(point["frequency"]),
+                }
+                for point in pitch_points
+            ],
+        }
+    except ValueError as error:
+        return {
+            "analysis_status": "no_pitch",
+            "duration": 0,
+            "target_notes": notes,
+            "sequence_accuracy": 0,
+            "segments": [],
+            "pitch_points": [],
+            "feedback": str(error),
+        }
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Sequence analysis failed. Upload a short 16-bit WAV recording and try again.",
         ) from error
     finally:
         if "temp_path" in locals() and temp_path.exists():

@@ -25,7 +25,7 @@ function resampleChannel(channelData, sourceRate, targetRate) {
   return output;
 }
 
-async function convertBlobToWav(blob) {
+export async function convertBlobToWav(blob) {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   if (!AudioContext) {
     throw new Error("This browser does not support audio processing.");

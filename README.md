@@ -24,6 +24,7 @@ This project combines frontend product design, backend API engineering, browser 
 - Frequency-first feedback when the user sings far from the selected note
 - Recorded pitch movement graph with target line, average line, high/low range, and rising/falling/steady drift
 - Sargam practice mode with selectable root Sa
+- Guided practice page with recommended drills, custom Sargam phrases, reference playback, live rough pitch tracking, and final multi-note scoring
 - Vocal stability classification: `stable`, `shaky`, `sharp_drift`, `flat_drift`, `off_pitch`
 - Heuristic vocal stability analysis from cents deviation, wobble, drift, and voiced-frame features
 - Pitch detection benchmark script for reporting note accuracy, cents error, and backend analysis latency
@@ -255,6 +256,17 @@ Example response:
 }
 ```
 
+### `POST /analyze-sequence`
+
+Multipart form:
+
+```text
+file: 16-bit WAV recording
+target_notes: C#3,D#3,F3,F#3,G#3
+```
+
+The endpoint analyzes a multi-note practice recording by splitting the clip across the requested target sequence, scoring each segment, and returning an overall sequence accuracy. It is designed for guided drills where each note is held for roughly the same duration.
+
 ## Pitch Detection Benchmark
 
 Run the benchmark from the backend directory:
@@ -318,7 +330,8 @@ Benchmarked custom pitch detector at 100% note detection accuracy across 96 cont
 4. Switch to `Hold` to sustain the note while matching your voice.
 5. Record yourself holding the pitch for 2-4 seconds.
 6. Review frequency, detected note, cents offset, pitch graph, drift direction, and AI vocal stability feedback.
-7. Open `/sargam` to calibrate the root and practice full Sa Re Ga Ma Pa Dha Ni Sa sequences.
+7. Open `/practice` for guided drills or a custom Sa Re Ga phrase with live pitch tracking and final sequence scoring.
+8. Open `/sargam` to calibrate the root and practice full Sa Re Ga Ma Pa Dha Ni Sa sequences.
 
 ## Resume Summary
 

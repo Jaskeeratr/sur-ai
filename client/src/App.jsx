@@ -1,10 +1,12 @@
 import { Activity, Mic2, Music2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { HarmoniumPage } from "./pages/HarmoniumPage.jsx";
+import { PracticePage } from "./pages/PracticePage.jsx";
 import { SargamPage } from "./pages/SargamPage.jsx";
 
 const ROUTES = {
   "/harmonium": HarmoniumPage,
+  "/practice": PracticePage,
   "/sargam": SargamPage
 };
 
@@ -70,6 +72,13 @@ export default function App() {
             onClick={() => navigate("/harmonium")}
           >
             Harmonium
+          </button>
+          <button
+            className={activePath === "/practice" ? "active" : ""}
+            type="button"
+            onClick={() => navigate("/practice")}
+          >
+            Practice
           </button>
           <button
             className={activePath === "/sargam" ? "active" : ""}

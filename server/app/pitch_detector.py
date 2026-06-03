@@ -202,7 +202,7 @@ def _build_frames(samples: list[float], sample_rate: int) -> tuple[list[tuple[fl
     return frames, rms_values
 
 
-def detect_pitch_points(file_path: Path) -> dict:
+def detect_pitch_points(file_path: Path, filter_stable: bool = True) -> dict:
     samples, sample_rate = _read_wav_mono(file_path)
     samples, sample_rate = _resample_linear(samples, sample_rate)
 
@@ -248,15 +248,17 @@ def detect_pitch_points(file_path: Path) -> dict:
         pitch_points = confident_points
 
     frequencies = [point["frequency"] for point in pitch_points]
-    median_frequency = _median(frequencies)
-    stable_points = [
-        point
-        for point in pitch_points
-        if abs(1200 * math.log2(point["frequency"] / median_frequency)) <= 260
-    ]
+    if filter_stable:
+        median_frequency = _median(frequencies)
+        stable_points = [
+            point
+            for point in pitch_points
+            if abs(1200 * math.log2(point["frequency"] / median_frequency)) <= 260
+        ]
 
-    if len(stable_points) >= 3:
-        pitch_points = stable_points
+        if len(stable_points) >= 3:
+            pitch_points = stable_points
+            frequencies = [point["frequency"] for point in pitch_points]
 
     weighted_total = sum(point["frequency"] * point["confidence"] for point in pitch_points)
     confidence_total = sum(point["confidence"] for point in pitch_points)

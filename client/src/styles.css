@@ -164,7 +164,8 @@ main {
 .recording-panel,
 .info-card,
 .sargam-controls,
-.step-controls {
+.step-controls,
+.practice-builder {
   background: #fffdf7;
   border: 1px solid #ddd3c0;
   border-radius: 8px;
@@ -248,7 +249,8 @@ main {
 }
 
 .sargam-controls h3,
-.summary-header h3 {
+.summary-header h3,
+.practice-builder h3 {
   margin: 0;
 }
 
@@ -256,6 +258,90 @@ main {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.practice-builder {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.practice-builder-row {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.practice-drill-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.practice-drill-grid button {
+  background: #f7f2e8;
+  border: 1px solid #d8cbb8;
+  border-radius: 8px;
+  color: #24312b;
+  cursor: pointer;
+  display: grid;
+  gap: 5px;
+  min-height: 88px;
+  padding: 13px;
+  text-align: left;
+}
+
+.practice-drill-grid button.selected {
+  background: #12372f;
+  border-color: #12372f;
+  color: #fffaf0;
+}
+
+.practice-drill-grid span {
+  color: inherit;
+  font-size: 0.86rem;
+  line-height: 1.35;
+  opacity: 0.78;
+}
+
+.practice-textarea {
+  background: #fffdf7;
+  border: 1px solid #d8cbb8;
+  border-radius: 8px;
+  color: #18211d;
+  font: inherit;
+  min-height: 92px;
+  padding: 12px 14px;
+  resize: vertical;
+  width: 100%;
+}
+
+.sequence-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sequence-pills span {
+  background: #f7f2e8;
+  border: 1px solid #e1d7c6;
+  border-radius: 999px;
+  color: #314139;
+  display: inline-flex;
+  gap: 6px;
+  padding: 8px 11px;
+}
+
+.practice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.live-graph {
+  margin-top: 14px;
+  min-height: 250px;
 }
 
 .step-controls {
@@ -763,6 +849,7 @@ dd {
   .recording-panel,
   .sargam-controls,
   .step-controls,
+  .practice-builder-row,
   dl div {
     align-items: flex-start;
     flex-direction: column;
@@ -786,6 +873,10 @@ dd {
 
   .compact-keyboard {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .practice-drill-grid {
+    grid-template-columns: 1fr;
   }
 
   .server-pill {
