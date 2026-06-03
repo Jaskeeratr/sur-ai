@@ -117,6 +117,77 @@ http://127.0.0.1:5173/api/analyze-note
 
 and are forwarded to FastAPI on port `8000`.
 
+## Deploy
+
+This repo is configured for a split deployment:
+
+- Frontend: Vercel static Vite app
+- Backend: Render FastAPI web service
+
+### Render Backend
+
+The backend service is defined in `render.yaml`.
+
+Render settings:
+
+```text
+Service name: sursadhana-ai-api
+Root directory: server
+Runtime: Python
+Build command: pip install -r requirements.txt
+Start command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+Health check: /health
+```
+
+Environment variables:
+
+```text
+PYTHON_VERSION=3.11.9
+ALLOWED_ORIGINS=https://your-vercel-app.vercel.app
+```
+
+During local development, `ALLOWED_ORIGINS` can stay unset because the API defaults to:
+
+```text
+http://127.0.0.1:5173,http://localhost:5173
+```
+
+Blueprint link after pushing this repo:
+
+```text
+https://dashboard.render.com/blueprint/new?repo=https://github.com/Jaskeeratr/sur-ai
+```
+
+After Render deploys, verify:
+
+```text
+https://sursadhana-ai-api.onrender.com/health
+```
+
+If you choose a different Render service name, use that generated URL instead.
+
+### Vercel Frontend
+
+The frontend deployment is defined in `vercel.json`.
+
+Vercel environment variable:
+
+```text
+VITE_API_BASE_URL=https://sursadhana-ai-api.onrender.com
+```
+
+If Render gives a different backend URL, set `VITE_API_BASE_URL` to that exact URL.
+
+Vercel uses:
+
+```text
+Install command: cd client && npm ci
+Build command: cd client && npm run build
+Output directory: client/dist
+```
+
+After Vercel gives the live frontend URL, update Render's `ALLOWED_ORIGINS` to that exact Vercel origin and redeploy the backend.
+
 ## API
 
 ### `GET /health`
