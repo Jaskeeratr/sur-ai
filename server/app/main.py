@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.feedback_engine import compare_pitch
 from app.ml_model import analyze_stability
-from app.note_mapper import cents_between, frequency_to_note, get_target_frequency
+from app.note_mapper import cents_between, frequency_to_note, get_target_frequency, nearest_note_match
 from app.pitch_detector import detect_pitch_points
 
 app = FastAPI(title="SurSadhana AI API")
@@ -59,6 +59,19 @@ def _no_pitch_response(target_note: str, target_frequency: float, detail: str) -
     }
 
 
+def _no_calibration_pitch_response(detail: str) -> dict:
+    return {
+        "analysis_status": "no_pitch",
+        "average_frequency": None,
+        "suggested_note": None,
+        "suggested_frequency": None,
+        "cents_from_suggested": None,
+        "duration": 0,
+        "voiced_frame_count": 0,
+        "feedback": detail,
+    }
+
+
 @app.post("/analyze-note")
 async def analyze_note(file: UploadFile = File(...), target_note: str = Form(...)):
     try:
@@ -108,6 +121,46 @@ async def analyze_note(file: UploadFile = File(...), target_note: str = Form(...
         raise HTTPException(
             status_code=500,
             detail="Audio analysis failed. Upload a short 16-bit WAV recording and try again.",
+        ) from error
+    finally:
+        if "temp_path" in locals() and temp_path.exists():
+            temp_path.unlink()
+
+
+@app.post("/calibrate-sa")
+async def calibrate_sa(file: UploadFile = File(...)):
+    suffix = Path(file.filename or "recording.wav").suffix or ".wav"
+
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
+            temp_audio.write(await file.read())
+            temp_path = Path(temp_audio.name)
+
+        detection = detect_pitch_points(temp_path)
+        average_frequency = detection["average_frequency"]
+        match = nearest_note_match(average_frequency)
+        if match is None:
+            return _no_calibration_pitch_response("No usable pitch was detected. Try a clear 2-5 second Sa.")
+
+        return {
+            "analysis_status": detection.get("analysis_status", "pitch_detected"),
+            "average_frequency": round(average_frequency, 2),
+            "suggested_note": match["note"],
+            "suggested_frequency": match["frequency"],
+            "cents_from_suggested": match["cents_from_note"],
+            "duration": round(detection.get("duration", 0), 2),
+            "voiced_frame_count": detection.get("voiced_frame_count", 0),
+            "feedback": (
+                f"Detected your comfortable Sa near {match['note']} "
+                f"({match['frequency']:.2f} Hz)."
+            ),
+        }
+    except ValueError as error:
+        return _no_calibration_pitch_response(str(error))
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Sa calibration failed. Upload a short 16-bit WAV recording and try again.",
         ) from error
     finally:
         if "temp_path" in locals() and temp_path.exists():

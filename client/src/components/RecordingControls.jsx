@@ -79,7 +79,18 @@ async function convertBlobToWav(blob) {
   return new Blob([view], { type: "audio/wav" });
 }
 
-export function RecordingControls({ disabled, isAnalyzing, onRecordingReady }) {
+export function RecordingControls({
+  disabled,
+  isAnalyzing,
+  onRecordingReady,
+  eyebrow = "Voice sample",
+  title = "Record your note",
+  recordingTitle = "Recording in progress",
+  description = "A short 2-5 second clip is enough for the first analysis pass.",
+  recordingDescription = "Hold the note steadily, then stop when ready.",
+  startLabel = "Start recording",
+  analyzingLabel = "Analyzing"
+}) {
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
@@ -140,12 +151,10 @@ export function RecordingControls({ disabled, isAnalyzing, onRecordingReady }) {
   return (
     <div className="recording-panel">
       <div>
-        <p className="eyebrow">Voice sample</p>
-        <h3>{isRecording ? "Recording in progress" : "Record your note"}</h3>
+        <p className="eyebrow">{eyebrow}</p>
+        <h3>{isRecording ? recordingTitle : title}</h3>
         <p className="muted">
-          {isRecording
-            ? "Hold the note steadily, then stop when ready."
-            : "A short 2-5 second clip is enough for the first analysis pass."}
+          {isRecording ? recordingDescription : description}
         </p>
       </div>
 
@@ -153,7 +162,7 @@ export function RecordingControls({ disabled, isAnalyzing, onRecordingReady }) {
         {!isRecording ? (
           <button className="primary-button" type="button" onClick={startRecording} disabled={isBusy}>
             {isAnalyzing ? <Loader2 className="spin" size={18} /> : <Mic size={18} />}
-            {isAnalyzing ? "Analyzing" : "Start recording"}
+            {isAnalyzing ? analyzingLabel : startLabel}
           </button>
         ) : (
           <button className="stop-button" type="button" onClick={stopRecording}>

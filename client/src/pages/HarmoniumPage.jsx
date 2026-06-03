@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { DEFAULT_HARMONIUM_NOTE, HARMONIUM_NOTES } from "../data/notes.js";
+import { DEFAULT_HARMONIUM_NOTE, DEFAULT_SA, buildHarmoniumKeys } from "../data/notes.js";
 import { HarmoniumKeyboard } from "../components/HarmoniumKeyboard.jsx";
 import { PracticeInstructions } from "../components/PracticeInstructions.jsx";
 import { SelectedNoteCard } from "../components/SelectedNoteCard.jsx";
 import { RecordingControls } from "../components/RecordingControls.jsx";
 import { FeedbackCard } from "../components/FeedbackCard.jsx";
 import { PitchGraph } from "../components/PitchGraph.jsx";
+import { SaCalibrationCard } from "../components/SaCalibrationCard.jsx";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
@@ -16,11 +17,21 @@ async function checkBackendHealth() {
   }
 }
 
+function parseNote(note) {
+  const match = note?.match(/^([A-G]#?)(\d)$/);
+  return match ? { noteName: match[1], octave: Number(match[2]) } : null;
+}
+
 export function HarmoniumPage() {
+  const [rootSa, setRootSa] = useState(DEFAULT_SA);
   const [selectedNote, setSelectedNote] = useState(DEFAULT_HARMONIUM_NOTE);
   const [analysis, setAnalysis] = useState(null);
   const [analysisError, setAnalysisError] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [calibration, setCalibration] = useState(null);
+  const [isCalibrating, setIsCalibrating] = useState(false);
+
+  const harmoniumNotes = useMemo(() => buildHarmoniumKeys(rootSa), [rootSa]);
 
   const pitchData = useMemo(() => {
     if (!analysis?.pitch_points) {
@@ -73,12 +84,58 @@ export function HarmoniumPage() {
     }
   }
 
+  async function calibrateSa(blob) {
+    setIsCalibrating(true);
+    setCalibration(null);
+    setAnalysis(null);
+    setAnalysisError("");
+
+    const formData = new FormData();
+    formData.append("file", blob, "sa-calibration.wav");
+
+    try {
+      await checkBackendHealth();
+      const response = await fetch(`${API_BASE_URL}/calibrate-sa`, {
+        method: "POST",
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody.detail || "Sa calibration failed.");
+      }
+
+      const nextCalibration = await response.json();
+      const parsedNote = parseNote(nextCalibration.suggested_note);
+      if (parsedNote) {
+        const nextNotes = buildHarmoniumKeys(parsedNote);
+        const calibratedNote = nextNotes.find((note) => note.note === nextCalibration.suggested_note);
+        if (calibratedNote) {
+          setRootSa(parsedNote);
+          setSelectedNote(calibratedNote);
+        }
+      }
+      setCalibration(nextCalibration);
+    } catch (error) {
+      setCalibration({
+        analysis_status: "request_failed",
+        average_frequency: null,
+        suggested_note: null,
+        suggested_frequency: null,
+        cents_from_suggested: null,
+        feedback: `The backend could not be reached. Confirm FastAPI is running on port 8000, then reload the page. ${error.message}`
+      });
+    } finally {
+      setIsCalibrating(false);
+    }
+  }
+
   return (
     <div className="practice-layout">
       <section className="practice-main">
         <PracticeInstructions />
         <HarmoniumKeyboard
-          notes={HARMONIUM_NOTES}
+          notes={harmoniumNotes}
           selectedNote={selectedNote}
           onSelect={(note) => {
             setSelectedNote(note);
@@ -86,8 +143,14 @@ export function HarmoniumPage() {
             setAnalysisError("");
           }}
         />
+        <SaCalibrationCard
+          calibration={calibration}
+          disabled={isAnalyzing || isCalibrating}
+          isCalibrating={isCalibrating}
+          onRecordingReady={calibrateSa}
+        />
         <RecordingControls
-          disabled={isAnalyzing}
+          disabled={isAnalyzing || isCalibrating}
           isAnalyzing={isAnalyzing}
           onRecordingReady={analyzeRecording}
         />

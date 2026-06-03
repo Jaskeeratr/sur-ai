@@ -58,7 +58,8 @@ button {
 .section-heading h3,
 .instructions h3,
 .recording-panel h3,
-.feedback-card h3 {
+.feedback-card h3,
+.calibration-heading h3 {
   margin: 0;
 }
 
@@ -379,6 +380,52 @@ main {
   display: flex;
   justify-content: space-between;
   gap: 18px;
+}
+
+.calibration-card {
+  display: grid;
+  gap: 10px;
+}
+
+.calibration-heading {
+  align-items: center;
+  color: #24312b;
+  display: flex;
+  gap: 10px;
+  padding-inline: 2px;
+}
+
+.calibration-heading svg {
+  color: #b54b35;
+}
+
+.calibration-result {
+  align-items: flex-start;
+  background: #edf7f2;
+  border: 1px solid #c9e2d7;
+  border-radius: 8px;
+  color: #155f4c;
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.calibration-result.no_pitch,
+.calibration-result.request_failed {
+  background: #fff1e8;
+  border-color: #ecc6ad;
+  color: #984126;
+}
+
+.calibration-result strong,
+.calibration-result span {
+  display: block;
+}
+
+.calibration-result span {
+  color: #43524a;
+  font-size: 0.9rem;
+  margin-top: 3px;
 }
 
 .recording-actions {

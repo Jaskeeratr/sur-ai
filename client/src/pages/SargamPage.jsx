@@ -5,6 +5,7 @@ import { HarmoniumKeyboard } from "../components/HarmoniumKeyboard.jsx";
 import { RecordingControls } from "../components/RecordingControls.jsx";
 import { FeedbackCard } from "../components/FeedbackCard.jsx";
 import { SelectedNoteCard } from "../components/SelectedNoteCard.jsx";
+import { SaCalibrationCard } from "../components/SaCalibrationCard.jsx";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
@@ -15,6 +16,11 @@ async function checkBackendHealth() {
   }
 }
 
+function parseNote(note) {
+  const match = note?.match(/^([A-G]#?)(\d)$/);
+  return match ? { noteName: match[1], octave: Number(match[2]) } : null;
+}
+
 export function SargamPage() {
   const [rootOption, setRootOption] = useState(ROOT_OPTIONS[0]);
   const [stepIndex, setStepIndex] = useState(0);
@@ -22,6 +28,8 @@ export function SargamPage() {
   const [analysis, setAnalysis] = useState(null);
   const [analysisError, setAnalysisError] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [calibration, setCalibration] = useState(null);
+  const [isCalibrating, setIsCalibrating] = useState(false);
 
   const scale = useMemo(
     () => buildSargamScale(rootOption.value, rootOption.octave),
@@ -38,6 +46,7 @@ export function SargamPage() {
     setResults([]);
     setAnalysis(null);
     setAnalysisError("");
+    setCalibration(null);
   }
 
   async function analyzeRecording(blob) {
@@ -91,6 +100,58 @@ export function SargamPage() {
       });
     } finally {
       setIsAnalyzing(false);
+    }
+  }
+
+  async function calibrateSa(blob) {
+    setIsCalibrating(true);
+    setCalibration(null);
+    setAnalysis(null);
+    setAnalysisError("");
+
+    const formData = new FormData();
+    formData.append("file", blob, "sa-calibration.wav");
+
+    try {
+      await checkBackendHealth();
+      const response = await fetch(`${API_BASE_URL}/calibrate-sa`, {
+        method: "POST",
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody.detail || "Sa calibration failed.");
+      }
+
+      const nextCalibration = await response.json();
+      const parsedNote = parseNote(nextCalibration.suggested_note);
+      const matchedRoot = parsedNote
+        ? ROOT_OPTIONS.find(
+            (option) => option.value === parsedNote.noteName && option.octave === parsedNote.octave
+          )
+        : null;
+
+      if (matchedRoot) {
+        resetSession(matchedRoot);
+      }
+      setCalibration({
+        ...nextCalibration,
+        feedback: matchedRoot
+          ? `${nextCalibration.feedback} Sargam root moved to ${matchedRoot.label}.`
+          : `${nextCalibration.feedback || "Sa detected."} Pick the closest root manually if it is outside the selector.`
+      });
+    } catch (error) {
+      setCalibration({
+        analysis_status: "request_failed",
+        average_frequency: null,
+        suggested_note: null,
+        suggested_frequency: null,
+        cents_from_suggested: null,
+        feedback: `The backend could not be reached. Confirm FastAPI is running on port 8000, then reload the page. ${error.message}`
+      });
+    } finally {
+      setIsCalibrating(false);
     }
   }
 
@@ -156,8 +217,14 @@ export function SargamPage() {
           </button>
         </div>
 
+        <SaCalibrationCard
+          calibration={calibration}
+          disabled={isAnalyzing || isCalibrating}
+          isCalibrating={isCalibrating}
+          onRecordingReady={calibrateSa}
+        />
         <RecordingControls
-          disabled={isAnalyzing}
+          disabled={isAnalyzing || isCalibrating}
           isAnalyzing={isAnalyzing}
           onRecordingReady={analyzeRecording}
         />

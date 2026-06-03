@@ -10,6 +10,7 @@ This project combines frontend product design, backend API engineering, browser 
 
 - Playable harmonium keyboard from `C3` to `B5`
 - Men's harmonium scale default: `C#3 = Sa`
+- "Find my Sa" voice calibration that detects a comfortable sung Sa and remaps the practice root
 - Tap mode for short reference notes
 - Hold mode for sustained reference notes while matching pitch
 - Browser microphone recording with compact 16 kHz WAV upload
@@ -49,6 +50,14 @@ FastAPI /analyze-note
       |
       v
 React feedback cards + pitch movement graph
+
+FastAPI /calibrate-sa
+      |
+      +--> detects the user's comfortable Sa frequency
+      +--> maps it to the nearest supported harmonium key
+      |
+      v
+React updates harmonium labels and sargam root
 ```
 
 ## Project Structure
@@ -147,6 +156,29 @@ Example response:
 }
 ```
 
+### `POST /calibrate-sa`
+
+Multipart form:
+
+```text
+file: 16-bit WAV recording
+```
+
+Example response:
+
+```json
+{
+  "analysis_status": "pitch_detected",
+  "average_frequency": 138.9,
+  "suggested_note": "C#3",
+  "suggested_frequency": 138.59,
+  "cents_from_suggested": 3.87,
+  "duration": 2.4,
+  "voiced_frame_count": 74,
+  "feedback": "Detected your comfortable Sa near C#3 (138.59 Hz)."
+}
+```
+
 ## Optional PyTorch Stability Model
 
 The app works without PyTorch by using the same extracted features with a deterministic fallback classifier. To train and use the PyTorch model:
@@ -169,12 +201,12 @@ The file is intentionally ignored by Git because model binaries can become large
 ## Demo Flow
 
 1. Open `/harmonium`.
-2. Keep the default men's scale target: `C#3 = Sa`.
+2. Use `Find my Sa` to record a comfortable Sa and auto-select the closest harmonium key.
 3. Use `Tap` to hear a short harmonium reference note.
 4. Switch to `Hold` to sustain the note while matching your voice.
 5. Record yourself holding the pitch for 2-4 seconds.
 6. Review frequency, detected note, cents offset, pitch graph, drift direction, and AI vocal stability feedback.
-7. Open `/sargam` to practice full Sa Re Ga Ma Pa Dha Ni Sa sequences.
+7. Open `/sargam` to calibrate the root and practice full Sa Re Ga Ma Pa Dha Ni Sa sequences.
 
 ## Resume Summary
 
@@ -185,4 +217,3 @@ Built SurSadhana AI, a full-stack audio ML singing practice app using React and 
 - The current pitch detector is optimized for short held notes, not full song transcription.
 - The PyTorch classifier starts with synthetic training data and should be improved with labeled real vocal recordings.
 - Browser microphone quality and background noise can affect pitch detection.
-

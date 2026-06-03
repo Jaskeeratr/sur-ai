@@ -45,5 +45,18 @@ def frequency_to_note(frequency: float) -> str | None:
     )
 
 
+def nearest_note_match(frequency: float) -> dict | None:
+    note = frequency_to_note(frequency)
+    if note is None:
+        return None
+
+    target_frequency = NOTE_FREQUENCIES[note]
+    return {
+        "note": note,
+        "frequency": target_frequency,
+        "cents_from_note": round(cents_between(frequency, target_frequency), 2),
+    }
+
+
 def cents_between(detected_frequency: float, target_frequency: float) -> float:
     return 1200 * math.log2(detected_frequency / target_frequency)
