@@ -339,6 +339,59 @@ main {
   gap: 10px;
 }
 
+.practice-settings {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.practice-settings label {
+  align-items: center;
+  background: #f7f2e8;
+  border: 1px solid #e1d7c6;
+  border-radius: 8px;
+  display: inline-flex;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.practice-settings label span,
+.noise-readout,
+.current-target span {
+  color: #5f6f66;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.practice-settings input {
+  accent-color: #1f6f5b;
+  max-width: 150px;
+}
+
+.noise-readout {
+  background: #edf7f2;
+  border-radius: 999px;
+  color: #155f4c;
+  padding: 8px 11px;
+}
+
+.current-target {
+  align-items: center;
+  background: #f7f2e8;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 12px;
+}
+
+.current-target strong {
+  color: #24312b;
+}
+
 .live-graph {
   margin-top: 14px;
   min-height: 250px;
@@ -877,6 +930,11 @@ dd {
 
   .practice-drill-grid {
     grid-template-columns: 1fr;
+  }
+
+  .practice-settings label,
+  .current-target {
+    width: 100%;
   }
 
   .server-pill {

@@ -18,13 +18,14 @@ This project combines frontend product design, backend API engineering, browser 
 - "Find my Sa" voice calibration that detects a comfortable sung Sa and remaps the practice root
 - Tap mode for short reference notes
 - Hold mode for sustained reference notes while matching pitch
+- Reed-style synthesized harmonium reference tone with detuned reeds, harmonic layers, filtered attack noise, and compression
 - Browser microphone recording with compact 16 kHz WAV upload
 - FastAPI pitch detection using a custom YIN-style held-note analyzer
 - Sharp/flat/on-pitch feedback using cents calculation
 - Frequency-first feedback when the user sings far from the selected note
 - Recorded pitch movement graph with target line, average line, high/low range, and rising/falling/steady drift
 - Sargam practice mode with selectable root Sa
-- Guided practice page with recommended drills, custom Sargam phrases, reference playback, live rough pitch tracking, and final multi-note scoring
+- Guided practice page with recommended drills, custom Sargam phrases, adjustable note timing, room-noise calibration, reference playback, live rough pitch tracking, and final multi-note scoring
 - Vocal stability classification: `stable`, `shaky`, `sharp_drift`, `flat_drift`, `off_pitch`
 - Heuristic vocal stability analysis from cents deviation, wobble, drift, and voiced-frame features
 - Pitch detection benchmark script for reporting note accuracy, cents error, and backend analysis latency
@@ -285,6 +286,14 @@ The benchmark generates controlled 2-second WAV samples across two octaves, smal
 - average and p95 analysis latency
 
 Benchmark numbers should be described as synthetic test results unless they are later collected from real user recordings.
+
+## Harmonium Audio Direction
+
+The current app uses a generated harmonium-style reference tone rather than bundled third-party samples. This keeps deployment simple and avoids unclear asset licensing. A future sample-based upgrade should use clearly licensed audio, document attribution, and avoid redistributing sample packs in a way the license forbids. Candidate sources reviewed:
+
+- Philharmonia sound samples: broad free sample library with usage restrictions around redistributing samples as-is.
+- Play Harmonium Online credits: documents a CC BY single-reed harmonium sample approach.
+- Pixabay harmonium sample page: royalty-free harmonium audio under the Pixabay Content License.
 
 To benchmark real vocal recordings, collect `.wav` files in a folder and include the expected note in each filename:
 

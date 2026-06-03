@@ -1,39 +1,6 @@
 import { MousePointerClick, Volume2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-
-function createHarmoniumVoice(audioContext, frequency) {
-  const output = audioContext.createGain();
-  const primary = audioContext.createOscillator();
-  const reed = audioContext.createOscillator();
-  const softBuzz = audioContext.createOscillator();
-  const primaryGain = audioContext.createGain();
-  const reedGain = audioContext.createGain();
-  const buzzGain = audioContext.createGain();
-
-  primary.type = "sine";
-  reed.type = "triangle";
-  softBuzz.type = "sawtooth";
-  primary.frequency.value = frequency;
-  reed.frequency.value = frequency * 2;
-  softBuzz.frequency.value = frequency * 3;
-  primaryGain.gain.value = 0.34;
-  reedGain.gain.value = 0.1;
-  buzzGain.gain.value = 0.025;
-  output.gain.value = 0;
-
-  primary.connect(primaryGain);
-  reed.connect(reedGain);
-  softBuzz.connect(buzzGain);
-  primaryGain.connect(output);
-  reedGain.connect(output);
-  buzzGain.connect(output);
-  output.connect(audioContext.destination);
-
-  return {
-    output,
-    oscillators: [primary, reed, softBuzz]
-  };
-}
+import { startHarmoniumVoice } from "../audio/harmonium.js";
 
 export function HarmoniumKeyboard({ notes, selectedNote, onSelect }) {
   const audioContextRef = useRef(null);
@@ -67,8 +34,18 @@ export function HarmoniumKeyboard({ notes, selectedNote, onSelect }) {
     voice.output.gain.cancelScheduledValues(now);
     voice.output.gain.setTargetAtTime(0, now, 0.035);
     window.setTimeout(() => {
-      voice.oscillators.forEach((oscillator) => oscillator.stop());
-      voice.output.disconnect();
+      voice.oscillators.forEach((oscillator) => {
+        try {
+          oscillator.stop();
+        } catch {
+          // Oscillator may already have a scheduled stop for tap playback.
+        }
+      });
+      try {
+        voice.output.disconnect();
+      } catch {
+        // Output may already be disconnected after a short tap note.
+      }
     }, 120);
     activeVoiceRef.current = null;
   }
@@ -84,15 +61,20 @@ export function HarmoniumKeyboard({ notes, selectedNote, onSelect }) {
     }
 
     stopTone();
-    const voice = createHarmoniumVoice(audioContext, note.frequency);
     const now = audioContext.currentTime;
-    voice.output.gain.setValueAtTime(0, now);
-    voice.output.gain.linearRampToValueAtTime(0.22, now + 0.035);
-    voice.oscillators.forEach((oscillator) => oscillator.start(now));
+    const voice = startHarmoniumVoice(audioContext, note, now, duration, 0.22);
     activeVoiceRef.current = { ...voice, audioContext };
-
     if (duration) {
-      window.setTimeout(() => stopTone(), duration);
+      window.setTimeout(() => {
+        if (activeVoiceRef.current?.output === voice.output) {
+          try {
+            voice.output.disconnect();
+          } catch {
+            // Tap note may already be disconnected.
+          }
+          activeVoiceRef.current = null;
+        }
+      }, duration + 220);
     }
   }
 

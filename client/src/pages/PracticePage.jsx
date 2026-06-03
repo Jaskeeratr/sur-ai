@@ -10,6 +10,7 @@ import {
   YAxis
 } from "recharts";
 import { convertBlobToWav } from "../components/RecordingControls.jsx";
+import { startHarmoniumVoice } from "../audio/harmonium.js";
 import { CHROMATIC_NOTES, DEFAULT_SA, MAJOR_SCALE_INTERVALS, SARGAM_LABELS, getFrequency } from "../data/notes.js";
 import { ROOT_OPTIONS } from "../data/sargam.js";
 
@@ -80,13 +81,17 @@ function buildPracticeNotes(text, rootOption) {
     });
 }
 
-function estimatePitch(samples, sampleRate) {
+function getRms(samples) {
   let rms = 0;
   for (const sample of samples) {
     rms += sample * sample;
   }
-  rms = Math.sqrt(rms / samples.length);
-  if (rms < 0.015) {
+  return Math.sqrt(rms / samples.length);
+}
+
+function estimatePitch(samples, sampleRate, gateThreshold) {
+  const rms = getRms(samples);
+  if (rms < gateThreshold) {
     return null;
   }
 
@@ -113,27 +118,6 @@ function estimatePitch(samples, sampleRate) {
   return sampleRate / bestOffset;
 }
 
-function createVoice(audioContext, frequency) {
-  const output = audioContext.createGain();
-  const primary = audioContext.createOscillator();
-  const reed = audioContext.createOscillator();
-  primary.type = "sine";
-  reed.type = "triangle";
-  primary.frequency.value = frequency;
-  reed.frequency.value = frequency * 2;
-  const primaryGain = audioContext.createGain();
-  const reedGain = audioContext.createGain();
-  primaryGain.gain.value = 0.32;
-  reedGain.gain.value = 0.08;
-  output.gain.value = 0;
-  primary.connect(primaryGain);
-  reed.connect(reedGain);
-  primaryGain.connect(output);
-  reedGain.connect(output);
-  output.connect(audioContext.destination);
-  return { output, oscillators: [primary, reed] };
-}
-
 export function PracticePage() {
   const [rootOption, setRootOption] = useState(ROOT_OPTIONS[0]);
   const [practiceText, setPracticeText] = useState(PRACTICES[1].text);
@@ -143,6 +127,10 @@ export function PracticePage() {
   const [error, setError] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isCalibratingNoise, setIsCalibratingNoise] = useState(false);
+  const [noiseFloor, setNoiseFloor] = useState(null);
+  const [noteDuration, setNoteDuration] = useState(1.2);
+  const [currentTarget, setCurrentTarget] = useState(null);
 
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
@@ -163,6 +151,48 @@ export function PracticePage() {
       })),
     [notes]
   );
+  const pitchGate = Math.max(0.015, (noiseFloor || 0) * 3.5);
+
+  async function calibrateNoise() {
+    setError("");
+    setIsCalibratingNoise(true);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) {
+        throw new Error("This browser does not support audio processing.");
+      }
+      const audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+      const source = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+      const levels = [];
+      const startedAt = performance.now();
+
+      await new Promise((resolve) => {
+        processor.onaudioprocess = (event) => {
+          levels.push(getRms(event.inputBuffer.getChannelData(0)));
+          if (performance.now() - startedAt > 1200) {
+            resolve();
+          }
+        };
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+      });
+
+      processor.disconnect();
+      source.disconnect();
+      await audioContext.close();
+      stream.getTracks().forEach((track) => track.stop());
+      const sorted = levels.sort((first, second) => first - second);
+      const median = sorted[Math.floor(sorted.length / 2)] || 0;
+      setNoiseFloor(Number(median.toFixed(4)));
+    } catch (calibrationError) {
+      setError(`Noise calibration failed. ${calibrationError.message}`);
+    } finally {
+      setIsCalibratingNoise(false);
+    }
+  }
 
   async function playReferenceSequence() {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -176,15 +206,8 @@ export function PracticePage() {
     }
 
     notes.forEach((note, index) => {
-      const start = audioContext.currentTime + index * 0.82;
-      const voice = createVoice(audioContext, note.frequency);
-      voice.output.gain.setValueAtTime(0, start);
-      voice.output.gain.linearRampToValueAtTime(0.2, start + 0.04);
-      voice.output.gain.setTargetAtTime(0, start + 0.62, 0.04);
-      voice.oscillators.forEach((oscillator) => {
-        oscillator.start(start);
-        oscillator.stop(start + 0.78);
-      });
+      const start = audioContext.currentTime + index * noteDuration;
+      startHarmoniumVoice(audioContext, note, start, Math.max(0.45, noteDuration * 0.86), 0.2);
     });
   }
 
@@ -197,6 +220,7 @@ export function PracticePage() {
     setError("");
     setAnalysis(null);
     setLivePoints([]);
+    setCurrentTarget(notes[0]);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -240,16 +264,19 @@ export function PracticePage() {
     const source = audioContext.createMediaStreamSource(stream);
     const processor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
     processor.onaudioprocess = (event) => {
-      const frequency = estimatePitch(event.inputBuffer.getChannelData(0), audioContext.sampleRate);
-      if (!frequency) {
+      const elapsed = (performance.now() - startedAtRef.current) / 1000;
+      const target = notes[Math.min(notes.length - 1, Math.floor(elapsed / noteDuration))] || notes[0];
+      setCurrentTarget(target);
+      const frequency = estimatePitch(event.inputBuffer.getChannelData(0), audioContext.sampleRate, pitchGate);
+      if (!frequency || !target) {
         return;
       }
-      const elapsed = (performance.now() - startedAtRef.current) / 1000;
       setLivePoints((current) => [
         ...current.slice(-80),
         {
           time: Number(elapsed.toFixed(2)),
-          frequency: Math.round(frequency * 100) / 100
+          frequency: Math.round(frequency * 100) / 100,
+          target: target.frequency
         }
       ]);
     };
@@ -267,6 +294,7 @@ export function PracticePage() {
     processorRef.current = null;
     sourceRef.current = null;
     audioContextRef.current = null;
+    setCurrentTarget(null);
   }
 
   function stopRecording() {
@@ -347,6 +375,28 @@ export function PracticePage() {
               ))}
             </div>
           </div>
+          <div className="practice-settings">
+            <label>
+              <span>Note length</span>
+              <input
+                max="2"
+                min="0.7"
+                step="0.1"
+                type="range"
+                value={noteDuration}
+                onChange={(event) => setNoteDuration(Number(event.target.value))}
+              />
+              <strong>{noteDuration.toFixed(1)}s</strong>
+            </label>
+            <button className="ghost-button" type="button" onClick={calibrateNoise} disabled={isCalibratingNoise || isRecording}>
+              {isCalibratingNoise ? <Loader2 className="spin" size={18} /> : <Mic size={18} />}
+              {isCalibratingNoise ? "Calibrating" : "Calibrate room"}
+            </button>
+            <span className="noise-readout">
+              Gate {pitchGate.toFixed(3)}
+              {noiseFloor != null ? ` from room ${noiseFloor.toFixed(4)}` : ""}
+            </span>
+          </div>
           <textarea
             className="practice-textarea"
             value={practiceText}
@@ -389,6 +439,10 @@ export function PracticePage() {
         <div className="info-card">
           <p className="eyebrow">Live pitch</p>
           <h3>{isRecording ? "Listening while you sing" : "Ready for live tracking"}</h3>
+          <div className="current-target">
+            <span>Current target</span>
+            <strong>{currentTarget ? `${currentTarget.sargam} / ${currentTarget.note}` : notes[0] ? `${notes[0].sargam} / ${notes[0].note}` : "-"}</strong>
+          </div>
           <div className="live-graph">
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={livePoints} margin={{ top: 12, right: 16, bottom: 8, left: 0 }}>
@@ -396,6 +450,7 @@ export function PracticePage() {
                 <YAxis domain={["dataMin - 40", "dataMax + 40"]} width={48} tick={{ fill: "#53635b", fontSize: 12 }} />
                 <Tooltip formatter={(value) => [`${Number(value).toFixed(2)} Hz`, "voice"]} />
                 {targetData[0] ? <ReferenceLine y={targetData[0].target} stroke="#1f6f5b" strokeDasharray="5 5" /> : null}
+                <Line type="stepAfter" dataKey="target" stroke="#1f6f5b" dot={false} strokeWidth={2} strokeOpacity={0.45} />
                 <Line type="monotone" dataKey="frequency" stroke="#b54b35" strokeWidth={3} dot={false} />
               </LineChart>
             </ResponsiveContainer>
