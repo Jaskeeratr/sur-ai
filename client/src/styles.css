@@ -16,6 +16,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 button {
@@ -155,6 +156,7 @@ main {
 .practice-side {
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .instructions,
@@ -168,6 +170,11 @@ main {
   border-radius: 8px;
   box-shadow: 0 14px 35px rgba(41, 34, 23, 0.08);
   padding: 20px;
+}
+
+.keyboard-panel,
+.info-card {
+  min-width: 0;
 }
 
 .instructions {
@@ -277,6 +284,9 @@ main {
     0 16px 28px rgba(64, 39, 20, 0.2);
   padding: 18px 18px 20px;
   position: relative;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .harmonium-brand {
@@ -302,7 +312,9 @@ main {
   grid-template-columns: repeat(36, minmax(34px, 1fr));
   min-height: 210px;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   padding: 18px 8px 8px;
+  width: 100%;
 }
 
 .compact-keyboard {

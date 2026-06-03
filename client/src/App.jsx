@@ -38,7 +38,7 @@ export default function App() {
           </div>
           <div>
             <p className="eyebrow">SurSadhana AI</p>
-            <h1>Harmonium Pitch Practice</h1>
+            <h1>AI Vocal Pitch Trainer</h1>
           </div>
         </div>
         <div className="server-pill">
@@ -50,17 +50,17 @@ export default function App() {
       <main>
         <section className="hero-band">
           <div>
-            <p className="eyebrow">MVP practice mode</p>
-            <h2>Match your voice to a target harmonium note.</h2>
+            <p className="eyebrow">Harmonium-guided riyaz</p>
+            <h2>Train pitch accuracy with live vocal feedback.</h2>
             <p>
-              Select Sa, Re, Ga, Ma, Pa, Dha, Ni, or upper Sa, then record a short
-              vocal sample for backend pitch analysis.
+              Calibrate your Sa, play a reference key, record a held note, and review
+              frequency, cents offset, pitch movement, and vocal stability in one workflow.
             </p>
           </div>
           <div className="hero-stat" aria-label="Recording and pitch analysis">
             <Mic2 size={30} aria-hidden="true" />
-            <span>Record</span>
-            <strong>Detect pitch</strong>
+            <span>Analyze</span>
+            <strong>Pitch, drift, stability</strong>
           </div>
         </section>
         <nav className="mode-tabs" aria-label="Practice modes">
