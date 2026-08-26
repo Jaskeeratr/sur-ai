@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Award, Gauge, LineChart as LineChartIcon, Trash2, TrendingUp } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Award, Download, Gauge, LineChart as LineChartIcon, Trash2, TrendingUp, Upload } from "lucide-react";
 import {
   CartesianGrid,
   Line,
@@ -10,7 +10,14 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { buildTrendData, clearProgress, loadProgress, summarizeProgress } from "../data/progress.js";
+import {
+  buildTrendData,
+  clearProgress,
+  exportProgress,
+  importProgress,
+  loadProgress,
+  summarizeProgress
+} from "../data/progress.js";
 
 const MODE_LABELS = {
   harmonium: "Harmonium",
@@ -34,6 +41,8 @@ function formatTimestamp(isoDate) {
 export function ProgressPage() {
   const [entries, setEntries] = useState(() => loadProgress());
   const [modeFilter, setModeFilter] = useState("all");
+  const [transferNotice, setTransferNotice] = useState("");
+  const fileInputRef = useRef(null);
 
   const filtered = useMemo(
     () => (modeFilter === "all" ? entries : entries.filter((entry) => entry.mode === modeFilter)),
@@ -45,6 +54,32 @@ export function ProgressPage() {
   function handleClear() {
     clearProgress();
     setEntries([]);
+    setTransferNotice("");
+  }
+
+  function handleExport() {
+    const blob = new Blob([exportProgress()], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `sursadhana-progress-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleImportFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+    try {
+      const { imported, total } = importProgress(await file.text());
+      setEntries(loadProgress());
+      setTransferNotice(`Imported ${imported} new attempt${imported === 1 ? "" : "s"} (${total} saved in total).`);
+    } catch (importError) {
+      setTransferNotice(importError.message);
+    }
   }
 
   return (
@@ -92,6 +127,25 @@ export function ProgressPage() {
               <strong>{summary.bestAccuracy != null ? `${summary.bestAccuracy}%` : "-"}</strong>
             </div>
           </div>
+
+          <div className="progress-actions">
+            <button className="ghost-button" type="button" onClick={handleExport} disabled={!entries.length}>
+              <Download size={18} />
+              Export history
+            </button>
+            <button className="ghost-button" type="button" onClick={() => fileInputRef.current?.click()}>
+              <Upload size={18} />
+              Import history
+            </button>
+            <input
+              ref={fileInputRef}
+              accept="application/json,.json"
+              hidden
+              type="file"
+              onChange={handleImportFile}
+            />
+          </div>
+          {transferNotice ? <p className="muted">{transferNotice}</p> : null}
 
           {trend.length >= 2 ? (
             <div className="graph-wrap">

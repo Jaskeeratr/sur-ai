@@ -9,6 +9,7 @@ from app.feedback_engine import compare_pitch
 from app.ml_model import analyze_stability
 from app.note_mapper import cents_between, frequency_to_note, get_target_frequency, nearest_note_match
 from app.pitch_detector import detect_pitch_points
+from app.sequence_aligner import MIN_SEGMENT_FRAMES, align_sequence
 
 app = FastAPI(title="SurSadhana AI API")
 
@@ -100,6 +101,23 @@ def _no_calibration_pitch_response(detail: str) -> dict:
     }
 
 
+def _no_pitch_segment(index: int, note: str, target_frequency: float, start_time: float, end_time: float) -> dict:
+    return {
+        "step": index + 1,
+        "target_note": note,
+        "target_frequency": target_frequency,
+        "start_time": round(start_time, 2),
+        "end_time": round(end_time, 2),
+        "average_frequency": None,
+        "detected_note": None,
+        "status": "no_pitch",
+        "accuracy": 0,
+        "cents_off": None,
+        "feedback": "No stable pitch was detected for this note.",
+        "voiced_frame_count": 0,
+    }
+
+
 def _average_frequency(points: list[dict]) -> float | None:
     if not points:
         return None
@@ -187,24 +205,29 @@ async def analyze_sequence(file: UploadFile = File(...), target_notes: str = For
         detection = detect_pitch_points(temp_path, filter_stable=False)
         duration = detection.get("duration", 0)
         pitch_points = detection["pitch_points"]
-        segment_duration = duration / len(notes) if notes else duration
         segments = []
 
-        for index, note in enumerate(notes):
-            start_time = index * segment_duration
-            end_time = duration if index == len(notes) - 1 else (index + 1) * segment_duration
-            transition_padding = min(0.09, segment_duration * 0.2)
-            scoring_start = start_time + (transition_padding if index > 0 else 0)
-            scoring_end = end_time - (transition_padding if index < len(notes) - 1 else 0)
-            segment_points = [
-                point
-                for point in pitch_points
-                if scoring_start <= point["time"] < scoring_end
-            ]
-            average_frequency = _average_frequency(segment_points)
-            target_frequency = target_frequencies[index]
+        spans = align_sequence(pitch_points, target_frequencies)
+        segmentation = "onset" if spans is not None else "uniform"
 
-            if average_frequency is None:
+        if spans is not None:
+            # Onset-aware path: each target owns the contiguous span of voiced
+            # frames the Viterbi alignment assigned to it, so held or rushed
+            # notes do not shift the scoring windows of later notes.
+            previous_end = 0.0
+            for index, note in enumerate(notes):
+                span = spans[index]
+                target_frequency = target_frequencies[index]
+
+                if len(span) < MIN_SEGMENT_FRAMES:
+                    segments.append(_no_pitch_segment(index, note, target_frequency, previous_end, previous_end))
+                    continue
+
+                start_time = span[0]["time"]
+                end_time = span[-1]["time"]
+                previous_end = end_time
+                average_frequency = _average_frequency(span)
+                comparison = compare_pitch(average_frequency, target_frequency)
                 segments.append(
                     {
                         "step": index + 1,
@@ -212,31 +235,47 @@ async def analyze_sequence(file: UploadFile = File(...), target_notes: str = For
                         "target_frequency": target_frequency,
                         "start_time": round(start_time, 2),
                         "end_time": round(end_time, 2),
-                        "average_frequency": None,
-                        "detected_note": None,
-                        "status": "no_pitch",
-                        "accuracy": 0,
-                        "cents_off": None,
-                        "feedback": "No stable pitch was detected for this note.",
-                        "voiced_frame_count": 0,
+                        "average_frequency": round(average_frequency, 2),
+                        "detected_note": frequency_to_note(average_frequency),
+                        "voiced_frame_count": len(span),
+                        **comparison,
                     }
                 )
-                continue
+        else:
+            # Fallback: too few voiced frames to align, split time uniformly.
+            segment_duration = duration / len(notes) if notes else duration
+            for index, note in enumerate(notes):
+                start_time = index * segment_duration
+                end_time = duration if index == len(notes) - 1 else (index + 1) * segment_duration
+                transition_padding = min(0.09, segment_duration * 0.2)
+                scoring_start = start_time + (transition_padding if index > 0 else 0)
+                scoring_end = end_time - (transition_padding if index < len(notes) - 1 else 0)
+                segment_points = [
+                    point
+                    for point in pitch_points
+                    if scoring_start <= point["time"] < scoring_end
+                ]
+                average_frequency = _average_frequency(segment_points)
+                target_frequency = target_frequencies[index]
 
-            comparison = compare_pitch(average_frequency, target_frequency)
-            segments.append(
-                {
-                    "step": index + 1,
-                    "target_note": note,
-                    "target_frequency": target_frequency,
-                    "start_time": round(start_time, 2),
-                    "end_time": round(end_time, 2),
-                    "average_frequency": round(average_frequency, 2),
-                    "detected_note": frequency_to_note(average_frequency),
-                    "voiced_frame_count": len(segment_points),
-                    **comparison,
-                }
-            )
+                if average_frequency is None:
+                    segments.append(_no_pitch_segment(index, note, target_frequency, start_time, end_time))
+                    continue
+
+                comparison = compare_pitch(average_frequency, target_frequency)
+                segments.append(
+                    {
+                        "step": index + 1,
+                        "target_note": note,
+                        "target_frequency": target_frequency,
+                        "start_time": round(start_time, 2),
+                        "end_time": round(end_time, 2),
+                        "average_frequency": round(average_frequency, 2),
+                        "detected_note": frequency_to_note(average_frequency),
+                        "voiced_frame_count": len(segment_points),
+                        **comparison,
+                    }
+                )
 
         scored_segments = [segment for segment in segments if segment["status"] != "no_pitch"]
         sequence_accuracy = (
@@ -249,6 +288,7 @@ async def analyze_sequence(file: UploadFile = File(...), target_notes: str = For
             "analysis_status": detection.get("analysis_status", "pitch_detected"),
             "duration": round(duration, 2),
             "target_notes": notes,
+            "segmentation": segmentation,
             "sequence_accuracy": sequence_accuracy,
             "segments": segments,
             "pitch_points": [

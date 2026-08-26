@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { buildTrendData, clearProgress, loadProgress, saveAttempt, summarizeProgress } from "./progress.js";
+import {
+  buildTrendData,
+  clearProgress,
+  exportProgress,
+  importProgress,
+  loadProgress,
+  saveAttempt,
+  summarizeProgress
+} from "./progress.js";
 
 function createStorageStub() {
   const store = new Map();
@@ -58,6 +66,36 @@ describe("summarizeProgress", () => {
     expect(summary.scoredAttempts).toBe(3);
     expect(summary.averageAccuracy).toBe(80);
     expect(summary.bestAccuracy).toBe(90);
+  });
+});
+
+describe("export and import", () => {
+  it("round-trips history through an export file", () => {
+    saveAttempt({ mode: "harmonium", label: "Sa / C#3", accuracy: 90 });
+    const backup = exportProgress();
+
+    clearProgress();
+    expect(loadProgress()).toEqual([]);
+
+    const result = importProgress(backup);
+    expect(result.imported).toBe(1);
+    expect(loadProgress()).toHaveLength(1);
+    expect(loadProgress()[0].label).toBe("Sa / C#3");
+  });
+
+  it("deduplicates by entry id when importing", () => {
+    saveAttempt({ mode: "sargam", label: "Pa / G#3", accuracy: 85 });
+    const backup = exportProgress();
+
+    const result = importProgress(backup);
+    expect(result.imported).toBe(0);
+    expect(loadProgress()).toHaveLength(1);
+  });
+
+  it("rejects files that are not progress exports", () => {
+    expect(() => importProgress("not json at all")).toThrow("not valid JSON");
+    expect(() => importProgress('{"foo": 1}')).toThrow("does not look like");
+    expect(() => importProgress('{"entries": [{"bogus": true}]}')).toThrow("No valid attempts");
   });
 });
 

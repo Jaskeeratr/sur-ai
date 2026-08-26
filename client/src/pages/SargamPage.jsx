@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { ROOT_OPTIONS, buildSargamScale } from "../data/sargam.js";
 import { DEFAULT_THAAT } from "../data/thaats.js";
 import { saveAttempt } from "../data/progress.js";
+import { AttemptPlayback } from "../components/AttemptPlayback.jsx";
 import { DroneToggle } from "../components/DroneToggle.jsx";
 import { LiveTuner } from "../components/LiveTuner.jsx";
 import { ThaatSelector } from "../components/ThaatSelector.jsx";
@@ -30,6 +31,7 @@ export function SargamPage() {
   const [calibration, setCalibration] = useState(null);
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [backendNotice, setBackendNotice] = useState("");
+  const [lastAttempt, setLastAttempt] = useState(null);
 
   const scale = useMemo(
     () => buildSargamScale(rootOption.value, rootOption.octave, thaat.intervals),
@@ -54,6 +56,7 @@ export function SargamPage() {
     setAnalysisError("");
     setAnalysis(null);
     setBackendNotice("");
+    setLastAttempt({ blob, notes: [selectedNote] });
 
     const formData = new FormData();
     formData.append("file", blob, "sargam-recording.wav");
@@ -275,6 +278,7 @@ export function SargamPage() {
       <aside className="practice-side">
         <SelectedNoteCard note={selectedNote} />
         <FeedbackCard analysis={analysis} isAnalyzing={isAnalyzing} />
+        <AttemptPlayback blob={lastAttempt?.blob} notes={lastAttempt?.notes} noteDuration={2.4} />
         <div className="info-card summary-card">
           <div className="summary-header">
             <div>

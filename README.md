@@ -31,6 +31,10 @@ This project combines frontend product design, backend API engineering, browser 
 - Live tuner on the Harmonium and Sargam pages: an AudioWorklet runs a YIN pitch detector on the microphone in real time and shows a cents-offset needle against the selected target
 - All ten Hindustani thaats (Bilawal, Kalyan, Khamaj, Kafi, Asavari, Bhairavi, Bhairav, Poorvi, Marwa, Todi) with komal swaras shown lowercase and tivra Ma as `Ma#`, driving the keyboard labels, sargam scales, and practice phrases
 - Alankar practice presets: three-note and four-note paltas, descending sargam, and a full aroha-avroha drill
+- Onset-aware sequence scoring: a Viterbi alignment assigns voiced frames to target notes where the sung pitch actually changes, so unevenly held notes no longer shift later scoring windows (uniform time slicing remains as fallback)
+- Attempt playback: replay your last recording on its own or layered under the harmonium reference
+- Progress export/import: back up riyaz history as JSON and merge it on another device
+- Installable PWA with an offline app shell (manifest, icons, and service worker via vite-plugin-pwa)
 - Tanpura-style Sa drone (Sa + low Pa layers) on the Harmonium, Practice, and Sargam pages that retunes automatically when the root Sa changes
 - Live recording timer with a 6-second auto-stop, and automatic stop of practice recordings once the phrase duration elapses
 - Progress page with per-device riyaz history: accuracy trend chart, mode filters, average/best/recent stats, and recent attempt list stored in `localStorage`
@@ -276,7 +280,7 @@ file: 16-bit WAV recording
 target_notes: C#3,D#3,F3,F#3,G#3
 ```
 
-The endpoint analyzes a multi-note practice recording by splitting the clip across the requested target sequence, scoring each segment, and returning an overall sequence accuracy. It is designed for guided drills where each note is held for roughly the same duration.
+The endpoint analyzes a multi-note practice recording by aligning the sung pitch contour to the requested target sequence with a monotonic Viterbi alignment (`segmentation: "onset"`), scoring each aligned span, and returning an overall sequence accuracy. Notes may be held for uneven durations; when the recording has too few voiced frames to align, the endpoint falls back to uniform time slicing (`segmentation: "uniform"`).
 
 ## Pitch Detection Benchmark
 
@@ -352,9 +356,11 @@ Benchmarked custom NumPy-vectorized pitch detector at 100% note detection accura
 7. Start the `Sa drone` for a sustained tanpura-style reference while practicing.
 8. Start the `Live tuner` and watch the cents needle while you hold the note - no recording needed.
 9. Pick a thaat (for example Kalyan or Bhairav) to relabel the keyboard and scales with komal/tivra swaras.
-10. Open `/practice` for guided drills, alankar paltas, or a custom Sargam phrase with live pitch tracking and final sequence scoring.
-11. Open `/sargam` to calibrate the root and practice the full scale in any thaat.
-12. Open `/progress` to review your saved riyaz history and accuracy trend.
+10. Use `Listen back` after any analysis to replay your attempt, alone or layered under the harmonium reference.
+11. Open `/practice` for guided drills, alankar paltas, or a custom Sargam phrase with live pitch tracking and onset-aligned sequence scoring.
+12. Open `/sargam` to calibrate the root and practice the full scale in any thaat.
+13. Open `/progress` to review your saved riyaz history, and export/import it as JSON to move it between devices.
+14. Install the app from the browser menu - it ships as a PWA with an offline app shell.
 
 ## Resume Summary
 

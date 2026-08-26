@@ -44,6 +44,59 @@ export function clearProgress() {
   writeStorage([]);
 }
 
+export function exportProgress() {
+  return JSON.stringify(
+    {
+      app: "sursadhana-ai",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: readStorage()
+    },
+    null,
+    2
+  );
+}
+
+function isValidEntry(entry) {
+  return (
+    entry &&
+    typeof entry === "object" &&
+    typeof entry.id === "string" &&
+    typeof entry.recordedAt === "string" &&
+    typeof entry.mode === "string"
+  );
+}
+
+// Merges an exported backup into local history, deduplicating by entry id.
+// Returns { imported, total } or throws on unrecognizable input.
+export function importProgress(json) {
+  let parsed;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    throw new Error("That file is not valid JSON.");
+  }
+
+  const incoming = Array.isArray(parsed) ? parsed : parsed?.entries;
+  if (!Array.isArray(incoming)) {
+    throw new Error("That file does not look like a SurSadhana progress export.");
+  }
+
+  const valid = incoming.filter(isValidEntry);
+  if (!valid.length) {
+    throw new Error("No valid attempts were found in that file.");
+  }
+
+  const existing = readStorage();
+  const known = new Set(existing.map((entry) => entry.id));
+  const added = valid.filter((entry) => !known.has(entry.id));
+  const merged = [...existing, ...added]
+    .sort((first, second) => second.recordedAt.localeCompare(first.recordedAt))
+    .slice(0, MAX_ENTRIES);
+  writeStorage(merged);
+  return { imported: added.length, total: merged.length };
+}
+
 export function summarizeProgress(entries) {
   const scored = entries.filter((entry) => Number.isFinite(entry.accuracy));
   if (!scored.length) {

@@ -10,6 +10,7 @@ import {
   YAxis
 } from "recharts";
 import { convertBlobToWav } from "../components/RecordingControls.jsx";
+import { AttemptPlayback } from "../components/AttemptPlayback.jsx";
 import { DroneToggle } from "../components/DroneToggle.jsx";
 import { ThaatSelector } from "../components/ThaatSelector.jsx";
 import { startHarmoniumVoice } from "../audio/harmonium.js";
@@ -87,6 +88,7 @@ export function PracticePage() {
   const [noteDuration, setNoteDuration] = useState(1.2);
   const [currentTarget, setCurrentTarget] = useState(null);
   const [backendNotice, setBackendNotice] = useState("");
+  const [lastAttempt, setLastAttempt] = useState(null);
 
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
@@ -261,6 +263,7 @@ export function PracticePage() {
     // Allow the WAV to cover the whole phrase instead of the single-note cap.
     const maxSeconds = Math.min(40, notes.length * noteDuration + 3);
     const wavBlob = await convertBlobToWav(blob, maxSeconds);
+    setLastAttempt({ blob: wavBlob, notes, noteDuration });
     const formData = new FormData();
     formData.append("file", wavBlob, "practice-sequence.wav");
     formData.append("target_notes", notes.map((note) => note.note).join(","));
@@ -458,6 +461,12 @@ export function PracticePage() {
             ))}
           </div>
         </div>
+
+        <AttemptPlayback
+          blob={lastAttempt?.blob}
+          notes={lastAttempt?.notes}
+          noteDuration={lastAttempt?.noteDuration}
+        />
       </aside>
     </div>
   );

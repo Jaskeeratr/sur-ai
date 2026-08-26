@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { DEFAULT_HARMONIUM_NOTE, DEFAULT_SA, buildHarmoniumKeys, getFrequency } from "../data/notes.js";
 import { DEFAULT_THAAT } from "../data/thaats.js";
 import { saveAttempt } from "../data/progress.js";
+import { AttemptPlayback } from "../components/AttemptPlayback.jsx";
 import { DroneToggle } from "../components/DroneToggle.jsx";
 import { LiveTuner } from "../components/LiveTuner.jsx";
 import { ThaatSelector } from "../components/ThaatSelector.jsx";
@@ -30,6 +31,7 @@ export function HarmoniumPage() {
   const [calibration, setCalibration] = useState(null);
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [backendNotice, setBackendNotice] = useState("");
+  const [lastAttempt, setLastAttempt] = useState(null);
 
   const harmoniumNotes = useMemo(() => buildHarmoniumKeys(rootSa, thaat.intervals), [rootSa, thaat]);
 
@@ -51,6 +53,7 @@ export function HarmoniumPage() {
     setAnalysisError("");
     setAnalysis(null);
     setBackendNotice("");
+    setLastAttempt({ blob, notes: [selectedNote] });
 
     const formData = new FormData();
     formData.append("file", blob, "voice-recording.wav");
@@ -195,6 +198,7 @@ export function HarmoniumPage() {
       <aside className="practice-side">
         <SelectedNoteCard note={selectedNote} />
         <FeedbackCard analysis={analysis} isAnalyzing={isAnalyzing} />
+        <AttemptPlayback blob={lastAttempt?.blob} notes={lastAttempt?.notes} noteDuration={2.4} />
         <PitchGraph data={pitchData} targetFrequency={selectedNote.frequency} />
       </aside>
     </div>

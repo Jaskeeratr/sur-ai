@@ -1142,6 +1142,35 @@ dd {
   color: #b54b35;
 }
 
+.attempt-card {
+  display: grid;
+  gap: 12px;
+}
+
+.attempt-header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.attempt-header h3 {
+  margin: 0;
+}
+
+.attempt-header svg {
+  color: #b54b35;
+}
+
+.attempt-audio {
+  width: 100%;
+}
+
+.progress-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .progress-mode {
   background: #edf7f2;
   border-radius: 999px;
