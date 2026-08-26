@@ -1,26 +1,18 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { ROOT_OPTIONS, buildSargamScale } from "../data/sargam.js";
+import { DEFAULT_THAAT } from "../data/thaats.js";
 import { saveAttempt } from "../data/progress.js";
 import { DroneToggle } from "../components/DroneToggle.jsx";
+import { LiveTuner } from "../components/LiveTuner.jsx";
+import { ThaatSelector } from "../components/ThaatSelector.jsx";
 import { HarmoniumKeyboard } from "../components/HarmoniumKeyboard.jsx";
 import { RecordingControls } from "../components/RecordingControls.jsx";
 import { FeedbackCard } from "../components/FeedbackCard.jsx";
 import { SelectedNoteCard } from "../components/SelectedNoteCard.jsx";
 import { SaCalibrationCard } from "../components/SaCalibrationCard.jsx";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
-
-function buildBackendError(error) {
-  return `The backend could not be reached at ${API_BASE_URL}. Check the deployed API URL and CORS allowed origins, then reload the page. ${error.message}`;
-}
-
-async function checkBackendHealth() {
-  const response = await fetch(`${API_BASE_URL}/health`, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`Backend health check returned ${response.status}.`);
-  }
-}
+import { API_BASE_URL, buildBackendError, checkBackendHealth } from "../data/api.js";
 
 function parseNote(note) {
   const match = note?.match(/^([A-G]#?)(\d)$/);
@@ -29,6 +21,7 @@ function parseNote(note) {
 
 export function SargamPage() {
   const [rootOption, setRootOption] = useState(ROOT_OPTIONS[0]);
+  const [thaat, setThaat] = useState(DEFAULT_THAAT);
   const [stepIndex, setStepIndex] = useState(0);
   const [results, setResults] = useState([]);
   const [analysis, setAnalysis] = useState(null);
@@ -36,10 +29,11 @@ export function SargamPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [calibration, setCalibration] = useState(null);
   const [isCalibrating, setIsCalibrating] = useState(false);
+  const [backendNotice, setBackendNotice] = useState("");
 
   const scale = useMemo(
-    () => buildSargamScale(rootOption.value, rootOption.octave),
-    [rootOption]
+    () => buildSargamScale(rootOption.value, rootOption.octave, thaat.intervals),
+    [rootOption, thaat]
   );
   const selectedNote = scale[stepIndex];
   const sessionScore = results.length
@@ -59,13 +53,17 @@ export function SargamPage() {
     setIsAnalyzing(true);
     setAnalysisError("");
     setAnalysis(null);
+    setBackendNotice("");
 
     const formData = new FormData();
     formData.append("file", blob, "sargam-recording.wav");
     formData.append("target_note", selectedNote.note);
 
     try {
-      await checkBackendHealth();
+      await checkBackendHealth({
+        onWaking: () => setBackendNotice("Waking the analysis backend (free hosting sleeps when idle)... this can take up to a minute.")
+      });
+      setBackendNotice("");
       const response = await fetch(`${API_BASE_URL}/analyze-note`, {
         method: "POST",
         body: formData
@@ -117,6 +115,7 @@ export function SargamPage() {
       });
     } finally {
       setIsAnalyzing(false);
+      setBackendNotice("");
     }
   }
 
@@ -125,12 +124,16 @@ export function SargamPage() {
     setCalibration(null);
     setAnalysis(null);
     setAnalysisError("");
+    setBackendNotice("");
 
     const formData = new FormData();
     formData.append("file", blob, "sa-calibration.wav");
 
     try {
-      await checkBackendHealth();
+      await checkBackendHealth({
+        onWaking: () => setBackendNotice("Waking the analysis backend (free hosting sleeps when idle)... this can take up to a minute.")
+      });
+      setBackendNotice("");
       const response = await fetch(`${API_BASE_URL}/calibrate-sa`, {
         method: "POST",
         body: formData
@@ -169,6 +172,7 @@ export function SargamPage() {
       });
     } finally {
       setIsCalibrating(false);
+      setBackendNotice("");
     }
   }
 
@@ -206,8 +210,22 @@ export function SargamPage() {
 
         <div className="drone-row">
           <DroneToggle frequency={scale[0].frequency} label={rootOption.label} />
+          <ThaatSelector
+            thaat={thaat}
+            onChange={(nextThaat) => {
+              setThaat(nextThaat);
+              setStepIndex(0);
+              setResults([]);
+              setAnalysis(null);
+            }}
+          />
           <span className="muted">Keep the Sa drone running while you move through the scale.</span>
         </div>
+
+        <LiveTuner
+          targetFrequency={selectedNote.frequency}
+          targetLabel={`${selectedNote.sargam} / ${selectedNote.note}`}
+        />
 
         <div className="step-controls">
           <button
@@ -250,6 +268,7 @@ export function SargamPage() {
           isAnalyzing={isAnalyzing}
           onRecordingReady={analyzeRecording}
         />
+        {backendNotice ? <p className="waking-banner">{backendNotice}</p> : null}
         {analysisError ? <p className="error-banner">{analysisError}</p> : null}
       </section>
 

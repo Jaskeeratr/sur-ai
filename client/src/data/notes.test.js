@@ -61,7 +61,7 @@ describe("buildSargamScale", () => {
       "Pa",
       "Dha",
       "Ni",
-      "Sa"
+      "Sa'"
     ]);
     expect(scale[0].note).toBe("C#3");
     expect(scale[7].note).toBe("C#4");

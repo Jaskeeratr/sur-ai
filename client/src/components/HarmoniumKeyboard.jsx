@@ -140,7 +140,7 @@ export function HarmoniumKeyboard({ notes, selectedNote, onSelect }) {
         >
           {notes.map((note, index) => {
             const isSelected = selectedNote.note === note.note;
-            const isSa = note.sargam === "Sa";
+            const isSa = note.sargam === "Sa" || note.sargam === "Sa'";
 
             return (
               <button

@@ -1,4 +1,5 @@
-import { CHROMATIC_NOTES, MAJOR_SCALE_INTERVALS, SARGAM_LABELS, getFrequency } from "./notes.js";
+import { CHROMATIC_NOTES, SARGAM_LABELS, getFrequency } from "./notes.js";
+import { DEFAULT_THAAT, sargamLabelForDegree } from "./thaats.js";
 
 export function parseToken(token) {
   const clean = token.trim();
@@ -7,7 +8,7 @@ export function parseToken(token) {
   }
   const upper = clean.replace(/[,]/g, "");
   const isUpperSa = upper.toLowerCase().startsWith("sa") && upper.includes("'");
-  const label = upper.replace(/'/g, "");
+  const label = upper.replace(/['#]/g, "");
   const normalized = SARGAM_LABELS.find((item) => item.toLowerCase() === label.toLowerCase());
   if (!normalized) {
     return null;
@@ -16,20 +17,20 @@ export function parseToken(token) {
   return { label: normalized, degree };
 }
 
-export function buildPracticeNotes(text, rootOption) {
+export function buildPracticeNotes(text, rootOption, intervals = DEFAULT_THAAT.intervals) {
   const rootIndex = CHROMATIC_NOTES.indexOf(rootOption.value);
   return text
     .split(/\s+/)
     .map(parseToken)
     .filter(Boolean)
     .map((token, index) => {
-      const interval = token.degree === 7 ? 12 : MAJOR_SCALE_INTERVALS[token.degree];
+      const interval = token.degree === 7 ? 12 : intervals[token.degree];
       const chromaticIndex = rootIndex + interval;
       const octave = rootOption.octave + Math.floor(chromaticIndex / CHROMATIC_NOTES.length);
       const noteName = CHROMATIC_NOTES[chromaticIndex % CHROMATIC_NOTES.length];
       return {
         step: index + 1,
-        sargam: token.degree === 7 ? "Sa'" : token.label,
+        sargam: token.degree === 7 ? "Sa'" : sargamLabelForDegree(token.degree, interval),
         note: `${noteName}${octave}`,
         frequency: getFrequency(noteName, octave)
       };

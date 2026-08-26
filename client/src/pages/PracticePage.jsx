@@ -11,15 +11,15 @@ import {
 } from "recharts";
 import { convertBlobToWav } from "../components/RecordingControls.jsx";
 import { DroneToggle } from "../components/DroneToggle.jsx";
+import { ThaatSelector } from "../components/ThaatSelector.jsx";
 import { startHarmoniumVoice } from "../audio/harmonium.js";
+import { createLivePitchTracker } from "../audio/livePitch.js";
 import { buildPracticeNotes } from "../data/practice.js";
 import { saveAttempt } from "../data/progress.js";
 import { getFrequency } from "../data/notes.js";
 import { ROOT_OPTIONS } from "../data/sargam.js";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
-const SAMPLE_RATE = 16000;
-const BUFFER_SIZE = 2048;
+import { DEFAULT_THAAT } from "../data/thaats.js";
+import { API_BASE_URL, checkBackendHealth } from "../data/api.js";
 
 const PRACTICES = [
   {
@@ -38,67 +38,43 @@ const PRACTICES = [
     id: "ascending",
     name: "Ascending Sargam",
     text: "Sa Re Ga Ma Pa Dha Ni Sa'",
-    goal: "Move upward through the major Sargam sequence."
+    goal: "Move upward through the full Sargam sequence."
+  },
+  {
+    id: "descending",
+    name: "Descending Sargam",
+    text: "Sa' Ni Dha Pa Ma Ga Re Sa",
+    goal: "Control the descent back to Sa without going flat."
   },
   {
     id: "turnaround",
     name: "Sargam Turnaround",
     text: "Sa Re Ga Re Sa",
     goal: "Control short melodic movement around Sa."
+  },
+  {
+    id: "alankar-3",
+    name: "Alankar: threes",
+    text: "Sa Re Ga Re Ga Ma Ga Ma Pa Ma Pa Dha Pa Dha Ni Dha Ni Sa'",
+    goal: "Classic three-note palta climbing the scale."
+  },
+  {
+    id: "alankar-4",
+    name: "Alankar: fours",
+    text: "Sa Re Ga Ma Re Ga Ma Pa Ga Ma Pa Dha Ma Pa Dha Ni Pa Dha Ni Sa'",
+    goal: "Four-note palta for smoother scale transitions."
+  },
+  {
+    id: "aroha-avroha",
+    name: "Aroha-Avroha",
+    text: "Sa Re Ga Ma Pa Dha Ni Sa' Sa' Ni Dha Pa Ma Ga Re Sa",
+    goal: "Full ascent and descent in one continuous phrase."
   }
 ];
 
-function getRms(samples) {
-  let rms = 0;
-  for (const sample of samples) {
-    rms += sample * sample;
-  }
-  return Math.sqrt(rms / samples.length);
-}
-
-function estimatePitch(samples, sampleRate, gateThreshold) {
-  const rms = getRms(samples);
-  if (rms < gateThreshold) {
-    return null;
-  }
-
-  let bestOffset = -1;
-  let bestScore = 0;
-  const minOffset = Math.floor(sampleRate / 900);
-  const maxOffset = Math.min(Math.floor(samples.length / 2), Math.floor(sampleRate / 70));
-  let energy = 0;
-  for (let index = 0; index < samples.length; index += 1) {
-    energy += samples[index] * samples[index];
-  }
-  if (energy <= 0) {
-    return null;
-  }
-
-  for (let offset = minOffset; offset <= maxOffset; offset += 1) {
-    let correlation = 0;
-    let laggedEnergy = 0;
-    for (let index = 0; index < samples.length - offset; index += 1) {
-      correlation += samples[index] * samples[index + offset];
-      laggedEnergy += samples[index + offset] * samples[index + offset];
-    }
-    if (laggedEnergy <= 0) {
-      continue;
-    }
-    const normalized = correlation / Math.sqrt(energy * laggedEnergy);
-    if (normalized > bestScore) {
-      bestScore = normalized;
-      bestOffset = offset;
-    }
-  }
-
-  if (bestOffset <= 0 || bestScore < 0.35) {
-    return null;
-  }
-  return sampleRate / bestOffset;
-}
-
 export function PracticePage() {
   const [rootOption, setRootOption] = useState(ROOT_OPTIONS[0]);
+  const [thaat, setThaat] = useState(DEFAULT_THAAT);
   const [practiceText, setPracticeText] = useState(PRACTICES[1].text);
   const [selectedPractice, setSelectedPractice] = useState(PRACTICES[1].id);
   const [livePoints, setLivePoints] = useState([]);
@@ -110,13 +86,12 @@ export function PracticePage() {
   const [noiseFloor, setNoiseFloor] = useState(null);
   const [noteDuration, setNoteDuration] = useState(1.2);
   const [currentTarget, setCurrentTarget] = useState(null);
+  const [backendNotice, setBackendNotice] = useState("");
 
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const processorRef = useRef(null);
-  const sourceRef = useRef(null);
+  const trackerRef = useRef(null);
   const startedAtRef = useRef(0);
   const referenceContextRef = useRef(null);
   const autoStopRef = useRef(null);
@@ -124,6 +99,8 @@ export function PracticePage() {
   useEffect(() => {
     return () => {
       window.clearTimeout(autoStopRef.current);
+      trackerRef.current?.stop();
+      trackerRef.current = null;
       const recorder = mediaRecorderRef.current;
       if (recorder && recorder.state !== "inactive") {
         recorder.stop();
@@ -134,7 +111,10 @@ export function PracticePage() {
     };
   }, []);
 
-  const notes = useMemo(() => buildPracticeNotes(practiceText, rootOption), [practiceText, rootOption]);
+  const notes = useMemo(
+    () => buildPracticeNotes(practiceText, rootOption, thaat.intervals),
+    [practiceText, rootOption, thaat]
+  );
   const targetData = useMemo(
     () =>
       notes.map((note, index) => ({
@@ -151,32 +131,12 @@ export function PracticePage() {
     setIsCalibratingNoise(true);
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContext) {
-        throw new Error("This browser does not support audio processing.");
-      }
-      const audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
       const levels = [];
-      const startedAt = performance.now();
-
-      await new Promise((resolve) => {
-        processor.onaudioprocess = (event) => {
-          levels.push(getRms(event.inputBuffer.getChannelData(0)));
-          if (performance.now() - startedAt > 1200) {
-            resolve();
-          }
-        };
-        source.connect(processor);
-        processor.connect(audioContext.destination);
+      const tracker = await createLivePitchTracker({
+        onFrame: (frame) => levels.push(frame.rms)
       });
-
-      processor.disconnect();
-      source.disconnect();
-      await audioContext.close();
-      stream.getTracks().forEach((track) => track.stop());
+      await new Promise((resolve) => window.setTimeout(resolve, 1400));
+      tracker.stop();
       const sorted = levels.sort((first, second) => first - second);
       const median = sorted[Math.floor(sorted.length / 2)] || 0;
       setNoiseFloor(Number(median.toFixed(4)));
@@ -236,7 +196,7 @@ export function PracticePage() {
         await analyzeRecording(new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" }));
       };
 
-      startLivePitch(stream);
+      await startLivePitch(stream);
       recorder.start();
       setIsRecording(true);
 
@@ -254,45 +214,36 @@ export function PracticePage() {
     }
   }
 
-  function startLivePitch(stream) {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) {
-      return;
-    }
-    const audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
-    const source = audioContext.createMediaStreamSource(stream);
-    const processor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
-    processor.onaudioprocess = (event) => {
-      const elapsed = (performance.now() - startedAtRef.current) / 1000;
-      const target = notes[Math.min(notes.length - 1, Math.floor(elapsed / noteDuration))] || notes[0];
-      setCurrentTarget(target);
-      const frequency = estimatePitch(event.inputBuffer.getChannelData(0), audioContext.sampleRate, pitchGate);
-      if (!frequency || !target) {
-        return;
-      }
-      setLivePoints((current) => [
-        ...current.slice(-80),
-        {
-          time: Number(elapsed.toFixed(2)),
-          frequency: Math.round(frequency * 100) / 100,
-          target: target.frequency
+  async function startLivePitch(stream) {
+    try {
+      trackerRef.current = await createLivePitchTracker({
+        stream,
+        onFrame: (frame) => {
+          const elapsed = (performance.now() - startedAtRef.current) / 1000;
+          const target = notes[Math.min(notes.length - 1, Math.floor(elapsed / noteDuration))] || notes[0];
+          setCurrentTarget(target);
+          if (!frame.frequency || frame.rms < pitchGate || frame.confidence < 0.5 || !target) {
+            return;
+          }
+          setLivePoints((current) => [
+            ...current.slice(-120),
+            {
+              time: Number(elapsed.toFixed(2)),
+              frequency: Math.round(frame.frequency * 100) / 100,
+              target: target.frequency
+            }
+          ]);
         }
-      ]);
-    };
-    source.connect(processor);
-    processor.connect(audioContext.destination);
-    audioContextRef.current = audioContext;
-    processorRef.current = processor;
-    sourceRef.current = source;
+      });
+    } catch {
+      // Live tracking is a nice-to-have; recording and scoring still work without it.
+      trackerRef.current = null;
+    }
   }
 
   function stopLivePitch() {
-    processorRef.current?.disconnect();
-    sourceRef.current?.disconnect();
-    audioContextRef.current?.close();
-    processorRef.current = null;
-    sourceRef.current = null;
-    audioContextRef.current = null;
+    trackerRef.current?.stop();
+    trackerRef.current = null;
     setCurrentTarget(null);
   }
 
@@ -307,12 +258,18 @@ export function PracticePage() {
 
   async function analyzeRecording(blob) {
     setIsAnalyzing(true);
-    const wavBlob = await convertBlobToWav(blob);
+    // Allow the WAV to cover the whole phrase instead of the single-note cap.
+    const maxSeconds = Math.min(40, notes.length * noteDuration + 3);
+    const wavBlob = await convertBlobToWav(blob, maxSeconds);
     const formData = new FormData();
     formData.append("file", wavBlob, "practice-sequence.wav");
     formData.append("target_notes", notes.map((note) => note.note).join(","));
 
     try {
+      await checkBackendHealth({
+        onWaking: () => setBackendNotice("Waking the analysis backend (free hosting sleeps when idle)... this can take up to a minute.")
+      });
+      setBackendNotice("");
       const response = await fetch(`${API_BASE_URL}/analyze-sequence`, {
         method: "POST",
         body: formData
@@ -335,6 +292,7 @@ export function PracticePage() {
       setError(`Could not analyze the practice recording. ${analysisError.message}`);
     } finally {
       setIsAnalyzing(false);
+      setBackendNotice("");
     }
   }
 
@@ -385,6 +343,14 @@ export function PracticePage() {
               ))}
             </div>
           </div>
+          <ThaatSelector
+            thaat={thaat}
+            onChange={(nextThaat) => {
+              setThaat(nextThaat);
+              setAnalysis(null);
+              setLivePoints([]);
+            }}
+          />
           <div className="practice-settings">
             <label>
               <span>Note length</span>
@@ -445,6 +411,7 @@ export function PracticePage() {
               </button>
             )}
           </div>
+          {backendNotice ? <p className="waking-banner">{backendNotice}</p> : null}
           {error ? <p className="error-banner">{error}</p> : null}
         </div>
       </section>

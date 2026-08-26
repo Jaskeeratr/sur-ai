@@ -1,7 +1,5 @@
-import { CHROMATIC_NOTES, DEFAULT_SA, MAJOR_SCALE_INTERVALS, SARGAM_LABELS, getFrequency } from "./notes.js";
-
-const SARGAM_SEQUENCE = [...SARGAM_LABELS, "Sa"];
-const SCALE_INTERVALS = [...MAJOR_SCALE_INTERVALS, 12];
+import { CHROMATIC_NOTES, DEFAULT_SA, getFrequency } from "./notes.js";
+import { DEFAULT_THAAT, sargamLabelForDegree } from "./thaats.js";
 
 export const ROOT_OPTIONS = [
   { label: "Men C#", value: "C#", octave: 3 },
@@ -20,16 +18,21 @@ export const ROOT_OPTIONS = [
   { label: "C", value: "C", octave: 4 }
 ];
 
-export function buildSargamScale(root = DEFAULT_SA.noteName, rootOctave = DEFAULT_SA.octave) {
+export function buildSargamScale(
+  root = DEFAULT_SA.noteName,
+  rootOctave = DEFAULT_SA.octave,
+  intervals = DEFAULT_THAAT.intervals
+) {
   const rootIndex = CHROMATIC_NOTES.indexOf(root);
+  const scaleIntervals = [...intervals, 12];
 
-  return SCALE_INTERVALS.map((interval, index) => {
+  return scaleIntervals.map((interval, index) => {
     const chromaticIndex = rootIndex + interval;
     const octave = rootOctave + Math.floor(chromaticIndex / CHROMATIC_NOTES.length);
     const noteName = CHROMATIC_NOTES[chromaticIndex % CHROMATIC_NOTES.length];
 
     return {
-      sargam: SARGAM_SEQUENCE[index],
+      sargam: index === 7 ? "Sa'" : sargamLabelForDegree(index, interval),
       note: `${noteName}${octave}`,
       frequency: getFrequency(noteName, octave),
       step: index + 1

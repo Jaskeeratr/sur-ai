@@ -25,7 +25,7 @@ function resampleChannel(channelData, sourceRate, targetRate) {
   return output;
 }
 
-export async function convertBlobToWav(blob) {
+export async function convertBlobToWav(blob, maxSeconds = MAX_RECORDING_SECONDS) {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   if (!AudioContext) {
     throw new Error("This browser does not support audio processing.");
@@ -39,7 +39,7 @@ export async function convertBlobToWav(blob) {
   const sampleRate = UPLOAD_SAMPLE_RATE;
   const maxSamples = Math.min(
     audioBuffer.length,
-    Math.floor(audioBuffer.sampleRate * MAX_RECORDING_SECONDS)
+    Math.floor(audioBuffer.sampleRate * maxSeconds)
   );
   const channelData = resampleChannel(
     audioBuffer.getChannelData(0).slice(0, maxSamples),

@@ -965,6 +965,183 @@ dd {
   font-weight: 600;
 }
 
+.page-loading {
+  color: #5f6f66;
+  font-weight: 750;
+  padding: 40px 0;
+  text-align: center;
+}
+
+.waking-banner {
+  background: #fdf6e3;
+  border: 1px solid #e3d3a1;
+  border-radius: 8px;
+  color: #7a5c14;
+  font-weight: 750;
+  margin: 0;
+  padding: 12px 14px;
+}
+
+.thaat-selector {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.thaat-selector label {
+  align-items: center;
+  background: #f7f2e8;
+  border: 1px solid #e1d7c6;
+  border-radius: 8px;
+  color: #24312b;
+  display: inline-flex;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+.thaat-selector label span {
+  color: #5f6f66;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.thaat-selector select {
+  background: transparent;
+  border: 0;
+  color: #24312b;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.thaat-selector em {
+  color: #5f6f66;
+  font-size: 0.84rem;
+  font-style: normal;
+}
+
+.tuner-card {
+  display: grid;
+  gap: 16px;
+}
+
+.tuner-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.tuner-header h3 {
+  margin: 0;
+}
+
+.tuner-active {
+  background: #b54b35;
+  border-color: #b54b35;
+  color: #fffaf0;
+}
+
+.tuner-meter {
+  display: grid;
+  gap: 6px;
+}
+
+.tuner-scale {
+  height: 16px;
+  position: relative;
+}
+
+.tuner-tick {
+  color: #5f6f66;
+  font-size: 0.72rem;
+  font-weight: 750;
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.tuner-track {
+  background: linear-gradient(90deg, #f3d9c4 0%, #f7f2e8 30%, #f7f2e8 70%, #f3d9c4 100%);
+  border: 1px solid #e1d7c6;
+  border-radius: 999px;
+  height: 26px;
+  overflow: hidden;
+  position: relative;
+}
+
+.tuner-green-zone {
+  background: rgba(31, 111, 91, 0.18);
+  border-inline: 1px solid rgba(31, 111, 91, 0.35);
+  height: 100%;
+  left: 40%;
+  position: absolute;
+  width: 20%;
+}
+
+.tuner-needle {
+  background: #24312b;
+  border-radius: 2px;
+  height: 100%;
+  position: absolute;
+  transform: translateX(-50%);
+  transition: left 90ms linear;
+  width: 4px;
+}
+
+.zone-in-tune .tuner-needle {
+  background: #1f6f5b;
+}
+
+.zone-close .tuner-needle {
+  background: #c98a1b;
+}
+
+.zone-off .tuner-needle {
+  background: #b54b35;
+}
+
+.tuner-needle-stale {
+  opacity: 0.35;
+}
+
+.tuner-readout {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.tuner-readout div {
+  background: #f7f2e8;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.tuner-readout span {
+  color: #5f6f66;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.tuner-readout strong {
+  font-size: 0.95rem;
+}
+
+.tuner-cents.zone-in-tune {
+  color: #1f6f5b;
+}
+
+.tuner-cents.zone-close {
+  color: #c98a1b;
+}
+
+.tuner-cents.zone-off {
+  color: #b54b35;
+}
+
 .progress-mode {
   background: #edf7f2;
   border-radius: 999px;
@@ -1027,7 +1204,8 @@ dd {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .pitch-summary {
+  .pitch-summary,
+  .tuner-readout {
     grid-template-columns: 1fr;
   }
 

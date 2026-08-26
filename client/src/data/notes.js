@@ -1,3 +1,5 @@
+import { DEFAULT_THAAT, sargamLabelForInterval } from "./thaats.js";
+
 export const CHROMATIC_NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 export const SARGAM_LABELS = ["Sa", "Re", "Ga", "Ma", "Pa", "Dha", "Ni"];
 export const MAJOR_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11];
@@ -15,22 +17,16 @@ function getChromaticDistance(fromNoteName, fromOctave, toNoteName, toOctave) {
   return toIndex - fromIndex;
 }
 
-export function getSargamLabel(noteName, octave, root = DEFAULT_SA) {
+export function getSargamLabel(noteName, octave, root = DEFAULT_SA, intervals = DEFAULT_THAAT.intervals) {
   const distance = getChromaticDistance(root.noteName, root.octave, noteName, octave);
   if (distance < 0) {
     return "";
   }
 
-  const scaleDegree = distance % 12;
-  const scaleIndex = MAJOR_SCALE_INTERVALS.indexOf(scaleDegree);
-  if (scaleIndex === -1) {
-    return "";
-  }
-
-  return SARGAM_LABELS[scaleIndex];
+  return sargamLabelForInterval(distance % 12, intervals);
 }
 
-export function buildHarmoniumKeys(root = DEFAULT_SA) {
+export function buildHarmoniumKeys(root = DEFAULT_SA, intervals = DEFAULT_THAAT.intervals) {
   const keys = [];
   for (let octave = 3; octave <= 5; octave += 1) {
     for (const noteName of CHROMATIC_NOTES) {
@@ -41,7 +37,7 @@ export function buildHarmoniumKeys(root = DEFAULT_SA) {
         note,
         frequency: getFrequency(noteName, octave),
         isBlack: noteName.includes("#"),
-        sargam: getSargamLabel(noteName, octave, root)
+        sargam: getSargamLabel(noteName, octave, root, intervals)
       });
     }
   }

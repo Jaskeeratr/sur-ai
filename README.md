@@ -28,18 +28,24 @@ This project combines frontend product design, backend API engineering, browser 
 - Guided practice page with recommended drills, custom Sargam phrases, adjustable note timing, room-noise calibration, reference playback, live rough pitch tracking, and final multi-note scoring
 - Vocal stability classification: `stable`, `shaky`, `sharp_drift`, `flat_drift`, `off_pitch`
 - Heuristic vocal stability analysis from cents deviation, wobble, drift, and voiced-frame features
+- Live tuner on the Harmonium and Sargam pages: an AudioWorklet runs a YIN pitch detector on the microphone in real time and shows a cents-offset needle against the selected target
+- All ten Hindustani thaats (Bilawal, Kalyan, Khamaj, Kafi, Asavari, Bhairavi, Bhairav, Poorvi, Marwa, Todi) with komal swaras shown lowercase and tivra Ma as `Ma#`, driving the keyboard labels, sargam scales, and practice phrases
+- Alankar practice presets: three-note and four-note paltas, descending sargam, and a full aroha-avroha drill
 - Tanpura-style Sa drone (Sa + low Pa layers) on the Harmonium, Practice, and Sargam pages that retunes automatically when the root Sa changes
 - Live recording timer with a 6-second auto-stop, and automatic stop of practice recordings once the phrase duration elapses
 - Progress page with per-device riyaz history: accuracy trend chart, mode filters, average/best/recent stats, and recent attempt list stored in `localStorage`
 - Upload size guard on all analysis endpoints (413 for clips over 10 MB)
+- NumPy-vectorized pitch detection with an FFT-based YIN difference function (~12 ms average analysis latency, down from ~717 ms pure-Python)
+- "Waking the backend" retry flow so free-tier cold starts show a friendly notice instead of an error
+- Lazy-loaded pages with vendor chunk splitting (initial bundle ~188 kB instead of ~600 kB)
 - Pitch detection benchmark script for reporting note accuracy, cents error, and backend analysis latency
 - GitHub Actions CI for backend tests, frontend unit tests, and frontend production builds
 
 ## Tech Stack
 
-- Frontend: React, Vite, Recharts, Lucide icons
-- Backend: FastAPI, Python standard-library WAV processing
-- Audio analysis: custom YIN-style pitch detector and cents-based note matching
+- Frontend: React, Vite, Recharts, Lucide icons, AudioWorklet live pitch tracking
+- Backend: FastAPI, NumPy-vectorized WAV processing
+- Audio analysis: custom YIN-style pitch detector (FFT-based difference function) and cents-based note matching
 - Stability analysis: deterministic feature-based classifier
 
 ## Architecture
@@ -325,14 +331,14 @@ Successful detections: 96 / 96
 Note detection accuracy: 100.00%
 Mean absolute cents error: 1.83 cents
 Median absolute cents error: 1.65 cents
-Average analysis latency: 717.36 ms
-P95 analysis latency: 826.40 ms
+Average analysis latency: 12.11 ms
+P95 analysis latency: 21.74 ms
 ```
 
 Resume-safe wording:
 
 ```text
-Benchmarked custom pitch detector at 100% note detection accuracy across 96 controlled synthetic vocal-tone recordings, with 1.83-cent mean absolute error and 717 ms average backend analysis latency.
+Benchmarked custom NumPy-vectorized pitch detector at 100% note detection accuracy across 96 controlled synthetic vocal-tone recordings, with 1.83-cent mean absolute error and 12 ms average backend analysis latency (59x faster than the original pure-Python implementation).
 ```
 
 ## Demo Flow
@@ -344,9 +350,11 @@ Benchmarked custom pitch detector at 100% note detection accuracy across 96 cont
 5. Record yourself holding the pitch for 2-4 seconds.
 6. Review frequency, detected note, cents offset, pitch graph, drift direction, and AI vocal stability feedback.
 7. Start the `Sa drone` for a sustained tanpura-style reference while practicing.
-8. Open `/practice` for guided drills or a custom Sa Re Ga phrase with live pitch tracking and final sequence scoring.
-9. Open `/sargam` to calibrate the root and practice full Sa Re Ga Ma Pa Dha Ni Sa sequences.
-10. Open `/progress` to review your saved riyaz history and accuracy trend.
+8. Start the `Live tuner` and watch the cents needle while you hold the note - no recording needed.
+9. Pick a thaat (for example Kalyan or Bhairav) to relabel the keyboard and scales with komal/tivra swaras.
+10. Open `/practice` for guided drills, alankar paltas, or a custom Sargam phrase with live pitch tracking and final sequence scoring.
+11. Open `/sargam` to calibrate the root and practice the full scale in any thaat.
+12. Open `/progress` to review your saved riyaz history and accuracy trend.
 
 ## Resume Summary
 

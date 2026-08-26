@@ -1,9 +1,20 @@
 import { Activity, Mic2, Music2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { HarmoniumPage } from "./pages/HarmoniumPage.jsx";
-import { PracticePage } from "./pages/PracticePage.jsx";
-import { ProgressPage } from "./pages/ProgressPage.jsx";
-import { SargamPage } from "./pages/SargamPage.jsx";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+
+// Pages are lazy-loaded so the initial bundle stays small; recharts and the
+// page code load per route.
+const HarmoniumPage = lazy(() =>
+  import("./pages/HarmoniumPage.jsx").then((module) => ({ default: module.HarmoniumPage }))
+);
+const PracticePage = lazy(() =>
+  import("./pages/PracticePage.jsx").then((module) => ({ default: module.PracticePage }))
+);
+const SargamPage = lazy(() =>
+  import("./pages/SargamPage.jsx").then((module) => ({ default: module.SargamPage }))
+);
+const ProgressPage = lazy(() =>
+  import("./pages/ProgressPage.jsx").then((module) => ({ default: module.ProgressPage }))
+);
 
 const ROUTES = {
   "/harmonium": HarmoniumPage,
@@ -97,7 +108,9 @@ export default function App() {
             Progress
           </button>
         </nav>
-        <ActivePage />
+        <Suspense fallback={<div className="page-loading">Loading page...</div>}>
+          <ActivePage />
+        </Suspense>
       </main>
     </div>
   );
