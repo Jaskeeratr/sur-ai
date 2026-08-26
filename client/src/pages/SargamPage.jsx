@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { ROOT_OPTIONS, buildSargamScale } from "../data/sargam.js";
+import { saveAttempt } from "../data/progress.js";
+import { DroneToggle } from "../components/DroneToggle.jsx";
 import { HarmoniumKeyboard } from "../components/HarmoniumKeyboard.jsx";
 import { RecordingControls } from "../components/RecordingControls.jsx";
 import { FeedbackCard } from "../components/FeedbackCard.jsx";
@@ -76,6 +78,17 @@ export function SargamPage() {
 
       const nextAnalysis = await response.json();
       setAnalysis(nextAnalysis);
+      if (nextAnalysis.analysis_status === "pitch_detected" && nextAnalysis.comparison_available !== false) {
+        saveAttempt({
+          mode: "sargam",
+          label: `${selectedNote.sargam} / ${selectedNote.note}`,
+          targetNote: selectedNote.note,
+          accuracy: nextAnalysis.accuracy,
+          centsOff: nextAnalysis.cents_off,
+          status: nextAnalysis.status,
+          stabilityLabel: nextAnalysis.stability_label
+        });
+      }
       if (nextAnalysis.comparison_available !== false) {
         setResults((currentResults) => {
           const withoutCurrent = currentResults.filter((result) => result.step !== selectedNote.step);
@@ -190,6 +203,11 @@ export function SargamPage() {
             setAnalysisError("");
           }}
         />
+
+        <div className="drone-row">
+          <DroneToggle frequency={scale[0].frequency} label={rootOption.label} />
+          <span className="muted">Keep the Sa drone running while you move through the scale.</span>
+        </div>
 
         <div className="step-controls">
           <button

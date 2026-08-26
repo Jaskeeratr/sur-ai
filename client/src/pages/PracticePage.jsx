@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Mic, Music2, Play, Square } from "lucide-react";
 import {
   Line,
@@ -10,8 +10,11 @@ import {
   YAxis
 } from "recharts";
 import { convertBlobToWav } from "../components/RecordingControls.jsx";
+import { DroneToggle } from "../components/DroneToggle.jsx";
 import { startHarmoniumVoice } from "../audio/harmonium.js";
-import { CHROMATIC_NOTES, DEFAULT_SA, MAJOR_SCALE_INTERVALS, SARGAM_LABELS, getFrequency } from "../data/notes.js";
+import { buildPracticeNotes } from "../data/practice.js";
+import { saveAttempt } from "../data/progress.js";
+import { getFrequency } from "../data/notes.js";
 import { ROOT_OPTIONS } from "../data/sargam.js";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
@@ -45,42 +48,6 @@ const PRACTICES = [
   }
 ];
 
-function parseToken(token) {
-  const clean = token.trim();
-  if (!clean) {
-    return null;
-  }
-  const upper = clean.replace(/[,]/g, "");
-  const isUpperSa = upper.toLowerCase().startsWith("sa") && upper.includes("'");
-  const label = upper.replace(/'/g, "");
-  const normalized = SARGAM_LABELS.find((item) => item.toLowerCase() === label.toLowerCase());
-  if (!normalized) {
-    return null;
-  }
-  const degree = normalized === "Sa" && isUpperSa ? 7 : SARGAM_LABELS.indexOf(normalized);
-  return { label: normalized, degree };
-}
-
-function buildPracticeNotes(text, rootOption) {
-  const rootIndex = CHROMATIC_NOTES.indexOf(rootOption.value);
-  return text
-    .split(/\s+/)
-    .map(parseToken)
-    .filter(Boolean)
-    .map((token, index) => {
-      const interval = token.degree === 7 ? 12 : MAJOR_SCALE_INTERVALS[token.degree];
-      const chromaticIndex = rootIndex + interval;
-      const octave = rootOption.octave + Math.floor(chromaticIndex / CHROMATIC_NOTES.length);
-      const noteName = CHROMATIC_NOTES[chromaticIndex % CHROMATIC_NOTES.length];
-      return {
-        step: index + 1,
-        sargam: token.degree === 7 ? "Sa'" : token.label,
-        note: `${noteName}${octave}`,
-        frequency: getFrequency(noteName, octave)
-      };
-    });
-}
-
 function getRms(samples) {
   let rms = 0;
   for (const sample of samples) {
@@ -96,23 +63,35 @@ function estimatePitch(samples, sampleRate, gateThreshold) {
   }
 
   let bestOffset = -1;
-  let bestCorrelation = 0;
+  let bestScore = 0;
   const minOffset = Math.floor(sampleRate / 900);
-  const maxOffset = Math.floor(sampleRate / 70);
+  const maxOffset = Math.min(Math.floor(samples.length / 2), Math.floor(sampleRate / 70));
+  let energy = 0;
+  for (let index = 0; index < samples.length; index += 1) {
+    energy += samples[index] * samples[index];
+  }
+  if (energy <= 0) {
+    return null;
+  }
 
   for (let offset = minOffset; offset <= maxOffset; offset += 1) {
     let correlation = 0;
+    let laggedEnergy = 0;
     for (let index = 0; index < samples.length - offset; index += 1) {
       correlation += samples[index] * samples[index + offset];
+      laggedEnergy += samples[index + offset] * samples[index + offset];
     }
-    correlation /= samples.length - offset;
-    if (correlation > bestCorrelation) {
-      bestCorrelation = correlation;
+    if (laggedEnergy <= 0) {
+      continue;
+    }
+    const normalized = correlation / Math.sqrt(energy * laggedEnergy);
+    if (normalized > bestScore) {
+      bestScore = normalized;
       bestOffset = offset;
     }
   }
 
-  if (bestOffset <= 0 || bestCorrelation < 0.01) {
+  if (bestOffset <= 0 || bestScore < 0.35) {
     return null;
   }
   return sampleRate / bestOffset;
@@ -140,6 +119,20 @@ export function PracticePage() {
   const sourceRef = useRef(null);
   const startedAtRef = useRef(0);
   const referenceContextRef = useRef(null);
+  const autoStopRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(autoStopRef.current);
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+      }
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      referenceContextRef.current?.close();
+      referenceContextRef.current = null;
+    };
+  }, []);
 
   const notes = useMemo(() => buildPracticeNotes(practiceText, rootOption), [practiceText, rootOption]);
   const targetData = useMemo(
@@ -246,6 +239,12 @@ export function PracticePage() {
       startLivePitch(stream);
       recorder.start();
       setIsRecording(true);
+
+      // Stop automatically once the phrase duration (plus a short tail) has passed.
+      const sequenceMs = notes.length * noteDuration * 1000 + 700;
+      autoStopRef.current = window.setTimeout(() => {
+        stopRecording();
+      }, sequenceMs);
     } catch (recordingError) {
       setError(
         recordingError.name === "NotAllowedError"
@@ -298,6 +297,8 @@ export function PracticePage() {
   }
 
   function stopRecording() {
+    window.clearTimeout(autoStopRef.current);
+    autoStopRef.current = null;
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== "inactive") {
       recorder.stop();
@@ -320,7 +321,16 @@ export function PracticePage() {
         const errorBody = await response.json().catch(() => ({}));
         throw new Error(errorBody.detail || "Practice analysis failed.");
       }
-      setAnalysis(await response.json());
+      const nextAnalysis = await response.json();
+      setAnalysis(nextAnalysis);
+      if (nextAnalysis.analysis_status === "pitch_detected") {
+        saveAttempt({
+          mode: "practice",
+          label: notes.map((note) => note.sargam).join(" "),
+          accuracy: nextAnalysis.sequence_accuracy,
+          status: nextAnalysis.analysis_status
+        });
+      }
     } catch (analysisError) {
       setError(`Could not analyze the practice recording. ${analysisError.message}`);
     } finally {
@@ -419,6 +429,10 @@ export function PracticePage() {
               <Play size={18} />
               Play reference
             </button>
+            <DroneToggle
+              frequency={getFrequency(rootOption.value, rootOption.octave)}
+              label={`${rootOption.label}`}
+            />
             {!isRecording ? (
               <button className="primary-button" type="button" onClick={startRecording} disabled={isAnalyzing}>
                 {isAnalyzing ? <Loader2 className="spin" size={18} /> : <Mic size={18} />}

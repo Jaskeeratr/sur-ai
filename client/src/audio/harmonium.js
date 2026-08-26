@@ -71,6 +71,63 @@ export function createHarmoniumVoice(audioContext, frequency) {
   };
 }
 
+export function startDrone(audioContext, saFrequency, level = 0.075) {
+  const output = audioContext.createGain();
+  const filter = audioContext.createBiquadFilter();
+  const oscillators = [];
+  const now = audioContext.currentTime;
+
+  // Tanpura-style Sa + low Pa drone: Sa, Pa below Sa, and an upper Sa shimmer.
+  const layers = [
+    { frequency: saFrequency, type: "triangle", gain: 0.5 },
+    { frequency: saFrequency * 0.75, type: "triangle", gain: 0.34 },
+    { frequency: saFrequency * 2, type: "sine", gain: 0.14 },
+    { frequency: saFrequency * 1.002, type: "sine", gain: 0.12 }
+  ];
+
+  for (const layer of layers) {
+    const oscillator = audioContext.createOscillator();
+    const layerGain = audioContext.createGain();
+    oscillator.type = layer.type;
+    oscillator.frequency.value = layer.frequency;
+    layerGain.gain.value = layer.gain;
+    oscillator.connect(layerGain);
+    layerGain.connect(filter);
+    oscillator.start(now);
+    oscillators.push(oscillator);
+  }
+
+  filter.type = "lowpass";
+  filter.frequency.value = 1500;
+  filter.Q.value = 0.6;
+  filter.connect(output);
+  output.connect(audioContext.destination);
+  output.gain.setValueAtTime(0, now);
+  output.gain.linearRampToValueAtTime(level, now + 0.8);
+
+  return {
+    stop() {
+      const stopAt = audioContext.currentTime;
+      output.gain.cancelScheduledValues(stopAt);
+      output.gain.setTargetAtTime(0, stopAt, 0.25);
+      for (const oscillator of oscillators) {
+        try {
+          oscillator.stop(stopAt + 1.2);
+        } catch {
+          // Oscillator may already be stopped.
+        }
+      }
+      window.setTimeout(() => {
+        try {
+          output.disconnect();
+        } catch {
+          // Output may already be disconnected.
+        }
+      }, 1400);
+    }
+  };
+}
+
 export function startHarmoniumVoice(audioContext, note, startTime, duration = null, level = 0.22) {
   const voice = createHarmoniumVoice(audioContext, note.frequency);
   voice.output.gain.setValueAtTime(0, startTime);

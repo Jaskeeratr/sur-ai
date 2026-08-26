@@ -1,5 +1,5 @@
 import { Square, Mic, Loader2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const UPLOAD_SAMPLE_RATE = 16000;
 const MAX_RECORDING_SECONDS = 6;
@@ -94,8 +94,33 @@ export function RecordingControls({
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
+  const timerRef = useRef(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingError, setRecordingError] = useState("");
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    return () => {
+      window.clearInterval(timerRef.current);
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+      }
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  function startTimer() {
+    const startedAt = performance.now();
+    setElapsedSeconds(0);
+    timerRef.current = window.setInterval(() => {
+      const elapsed = (performance.now() - startedAt) / 1000;
+      setElapsedSeconds(elapsed);
+      if (elapsed >= MAX_RECORDING_SECONDS) {
+        stopRecording();
+      }
+    }, 200);
+  }
 
   async function startRecording() {
     setRecordingError("");
@@ -128,6 +153,7 @@ export function RecordingControls({
       };
 
       recorder.start();
+      startTimer();
       setIsRecording(true);
     } catch (error) {
       setRecordingError(
@@ -139,6 +165,8 @@ export function RecordingControls({
   }
 
   function stopRecording() {
+    window.clearInterval(timerRef.current);
+    timerRef.current = null;
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== "inactive") {
       recorder.stop();
@@ -156,6 +184,12 @@ export function RecordingControls({
         <p className="muted">
           {isRecording ? recordingDescription : description}
         </p>
+        {isRecording ? (
+          <div className="recording-timer" role="timer" aria-live="polite">
+            <span className="recording-dot" aria-hidden="true" />
+            {elapsedSeconds.toFixed(1)}s / {MAX_RECORDING_SECONDS}s
+          </div>
+        ) : null}
       </div>
 
       <div className="recording-actions">

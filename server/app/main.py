@@ -1,4 +1,4 @@
-import tempfile
+﻿import tempfile
 import os
 from pathlib import Path
 
@@ -11,6 +11,20 @@ from app.note_mapper import cents_between, frequency_to_note, get_target_frequen
 from app.pitch_detector import detect_pitch_points
 
 app = FastAPI(title="SurSadhana AI API")
+
+# Uploads are short 16 kHz mono recordings; anything larger than this is not a
+# practice clip and is rejected before analysis.
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
+
+async def _read_upload(file: UploadFile) -> bytes:
+    payload = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(payload) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail="Recording is too large. Upload a short practice clip under 10 MB.",
+        )
+    return payload
 
 DEFAULT_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
@@ -106,7 +120,7 @@ async def analyze_note(file: UploadFile = File(...), target_note: str = Form(...
 
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
-            temp_audio.write(await file.read())
+            temp_audio.write(await _read_upload(file))
             temp_path = Path(temp_audio.name)
 
         detection = detect_pitch_points(temp_path)
@@ -140,6 +154,8 @@ async def analyze_note(file: UploadFile = File(...), target_note: str = Form(...
         }
     except ValueError as error:
         return _no_pitch_response(target_note, target_frequency, str(error))
+    except HTTPException:
+        raise
     except Exception as error:
         raise HTTPException(
             status_code=500,
@@ -165,7 +181,7 @@ async def analyze_sequence(file: UploadFile = File(...), target_notes: str = For
 
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
-            temp_audio.write(await file.read())
+            temp_audio.write(await _read_upload(file))
             temp_path = Path(temp_audio.name)
 
         detection = detect_pitch_points(temp_path, filter_stable=False)
@@ -253,6 +269,8 @@ async def analyze_sequence(file: UploadFile = File(...), target_notes: str = For
             "pitch_points": [],
             "feedback": str(error),
         }
+    except HTTPException:
+        raise
     except Exception as error:
         raise HTTPException(
             status_code=500,
@@ -269,7 +287,7 @@ async def calibrate_sa(file: UploadFile = File(...)):
 
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
-            temp_audio.write(await file.read())
+            temp_audio.write(await _read_upload(file))
             temp_path = Path(temp_audio.name)
 
         detection = detect_pitch_points(temp_path)
@@ -293,6 +311,8 @@ async def calibrate_sa(file: UploadFile = File(...)):
         }
     except ValueError as error:
         return _no_calibration_pitch_response(str(error))
+    except HTTPException:
+        raise
     except Exception as error:
         raise HTTPException(
             status_code=500,

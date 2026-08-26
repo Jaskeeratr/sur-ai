@@ -28,8 +28,12 @@ This project combines frontend product design, backend API engineering, browser 
 - Guided practice page with recommended drills, custom Sargam phrases, adjustable note timing, room-noise calibration, reference playback, live rough pitch tracking, and final multi-note scoring
 - Vocal stability classification: `stable`, `shaky`, `sharp_drift`, `flat_drift`, `off_pitch`
 - Heuristic vocal stability analysis from cents deviation, wobble, drift, and voiced-frame features
+- Tanpura-style Sa drone (Sa + low Pa layers) on the Harmonium, Practice, and Sargam pages that retunes automatically when the root Sa changes
+- Live recording timer with a 6-second auto-stop, and automatic stop of practice recordings once the phrase duration elapses
+- Progress page with per-device riyaz history: accuracy trend chart, mode filters, average/best/recent stats, and recent attempt list stored in `localStorage`
+- Upload size guard on all analysis endpoints (413 for clips over 10 MB)
 - Pitch detection benchmark script for reporting note accuracy, cents error, and backend analysis latency
-- GitHub Actions CI for backend tests and frontend production builds
+- GitHub Actions CI for backend tests, frontend unit tests, and frontend production builds
 
 ## Tech Stack
 
@@ -72,9 +76,9 @@ React updates harmonium labels and sargam root
 
 ```text
 client/
-  src/components/        UI controls, harmonium keyboard, feedback cards, graph
-  src/data/              note maps, sargam scale generation
-  src/pages/             harmonium and sargam practice pages
+  src/components/        UI controls, harmonium keyboard, feedback cards, graph, drone toggle
+  src/data/              note maps, sargam scale generation, practice phrase parsing, progress store
+  src/pages/             harmonium, practice, sargam, and progress pages
 
 server/
   app/main.py            FastAPI app
@@ -339,8 +343,10 @@ Benchmarked custom pitch detector at 100% note detection accuracy across 96 cont
 4. Switch to `Hold` to sustain the note while matching your voice.
 5. Record yourself holding the pitch for 2-4 seconds.
 6. Review frequency, detected note, cents offset, pitch graph, drift direction, and AI vocal stability feedback.
-7. Open `/practice` for guided drills or a custom Sa Re Ga phrase with live pitch tracking and final sequence scoring.
-8. Open `/sargam` to calibrate the root and practice full Sa Re Ga Ma Pa Dha Ni Sa sequences.
+7. Start the `Sa drone` for a sustained tanpura-style reference while practicing.
+8. Open `/practice` for guided drills or a custom Sa Re Ga phrase with live pitch tracking and final sequence scoring.
+9. Open `/sargam` to calibrate the root and practice full Sa Re Ga Ma Pa Dha Ni Sa sequences.
+10. Open `/progress` to review your saved riyaz history and accuracy trend.
 
 ## Resume Summary
 
@@ -354,7 +360,7 @@ Built SurSadhana AI, a full-stack audio analysis singing practice app using Reac
 
 ## Quality Checks
 
-Backend tests and frontend builds run in GitHub Actions on every push and pull request. Run the same checks locally:
+Backend tests, frontend unit tests, and frontend builds run in GitHub Actions on every push and pull request. Run the same checks locally:
 
 ```bash
 cd server
@@ -362,5 +368,6 @@ cd server
 python -m pytest tests
 
 cd ../client
+npm test
 npm run build
 ```

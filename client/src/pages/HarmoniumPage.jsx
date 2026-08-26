@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { DEFAULT_HARMONIUM_NOTE, DEFAULT_SA, buildHarmoniumKeys } from "../data/notes.js";
+import { DEFAULT_HARMONIUM_NOTE, DEFAULT_SA, buildHarmoniumKeys, getFrequency } from "../data/notes.js";
+import { saveAttempt } from "../data/progress.js";
+import { DroneToggle } from "../components/DroneToggle.jsx";
 import { HarmoniumKeyboard } from "../components/HarmoniumKeyboard.jsx";
 import { PracticeInstructions } from "../components/PracticeInstructions.jsx";
 import { SelectedNoteCard } from "../components/SelectedNoteCard.jsx";
@@ -71,7 +73,19 @@ export function HarmoniumPage() {
         throw new Error(errorBody.detail || "Pitch analysis failed.");
       }
 
-      setAnalysis(await response.json());
+      const nextAnalysis = await response.json();
+      setAnalysis(nextAnalysis);
+      if (nextAnalysis.analysis_status === "pitch_detected" && nextAnalysis.comparison_available !== false) {
+        saveAttempt({
+          mode: "harmonium",
+          label: selectedNote.sargam ? `${selectedNote.sargam} / ${selectedNote.note}` : selectedNote.note,
+          targetNote: selectedNote.note,
+          accuracy: nextAnalysis.accuracy,
+          centsOff: nextAnalysis.cents_off,
+          status: nextAnalysis.status,
+          stabilityLabel: nextAnalysis.stability_label
+        });
+      }
     } catch (error) {
       setAnalysis({
         analysis_status: "request_failed",
@@ -147,6 +161,13 @@ export function HarmoniumPage() {
             setAnalysisError("");
           }}
         />
+        <div className="drone-row">
+          <DroneToggle
+            frequency={getFrequency(rootSa.noteName, rootSa.octave)}
+            label={`${rootSa.noteName}${rootSa.octave}`}
+          />
+          <span className="muted">Hold your Sa against a steady tanpura-style drone while you practice.</span>
+        </div>
         <SaCalibrationCard
           calibration={calibration}
           disabled={isAnalyzing || isCalibrating}
