@@ -27,7 +27,8 @@ This project combines frontend product design, backend API engineering, browser 
 - Sargam practice mode with selectable root Sa
 - Guided practice page with recommended drills, custom Sargam phrases, adjustable note timing, room-noise calibration, reference playback, live rough pitch tracking, and final multi-note scoring
 - Vocal stability classification: `stable`, `shaky`, `sharp_drift`, `flat_drift`, `off_pitch`
-- Heuristic vocal stability analysis from cents deviation, wobble, drift, and voiced-frame features
+- Trained stability classifier (85.3% held-out accuracy) learned from 3,000 synthesized vocal contours measured through the real pitch detector, with the original heuristic kept as an automatic fallback
+- Per-swara tendency analytics: aggregates every saved attempt to say which swara you consistently sing sharp or flat ("Focus on Ga - it averages 31 cents flat")
 - Live tuner on the Harmonium and Sargam pages: an AudioWorklet runs a YIN pitch detector on the microphone in real time and shows a cents-offset needle against the selected target
 - All ten Hindustani thaats (Bilawal, Kalyan, Khamaj, Kafi, Asavari, Bhairavi, Bhairav, Poorvi, Marwa, Todi) with komal swaras shown lowercase and tivra Ma as `Ma#`, driving the keyboard labels, sargam scales, and practice phrases
 - Alankar practice presets: three-note and four-note paltas, descending sargam, and a full aroha-avroha drill
@@ -50,7 +51,7 @@ This project combines frontend product design, backend API engineering, browser 
 - Frontend: React, Vite, Recharts, Lucide icons, AudioWorklet live pitch tracking
 - Backend: FastAPI, NumPy-vectorized WAV processing
 - Audio analysis: custom YIN-style pitch detector (FFT-based difference function) and cents-based note matching
-- Stability analysis: deterministic feature-based classifier
+- Stability analysis: multinomial logistic-regression classifier trained offline with scikit-learn, exported as plain weights and scored at runtime with NumPy
 
 ## Architecture
 
@@ -94,7 +95,11 @@ server/
   app/main.py            FastAPI app
   app/pitch_detector.py  WAV reading and pitch contour detection
   app/feedback_engine.py cents feedback and accuracy
-  app/ml_model.py        stability feature extraction and heuristic classification
+  app/ml_model.py        stability feature extraction, trained model + heuristic fallback
+  app/stability_model.py NumPy inference over the exported classifier weights
+  app/models/            the committed stability_model.json artifact
+  app/sequence_aligner.py onset-aware alignment of a contour to a note sequence
+  training/              dataset synthesis and model training (scikit-learn, dev only)
   benchmarks/            pitch detection accuracy and latency benchmark
 ```
 
@@ -243,7 +248,14 @@ Example response:
   "stability": 88,
   "stability_label": "stable",
   "stability_confidence": 0.91,
-  "model_source": "heuristic",
+  "label_probabilities": {
+    "flat_drift": 0.01,
+    "off_pitch": 0.0,
+    "shaky": 0.07,
+    "sharp_drift": 0.01,
+    "stable": 0.91
+  },
+  "model_source": "trained:logistic_regression",
   "ai_feedback": "Your pitch was stable for the held note."
 }
 ```
@@ -281,6 +293,58 @@ target_notes: C#3,D#3,F3,F#3,G#3
 ```
 
 The endpoint analyzes a multi-note practice recording by aligning the sung pitch contour to the requested target sequence with a monotonic Viterbi alignment (`segmentation: "onset"`), scoring each aligned span, and returning an overall sequence accuracy. Notes may be held for uneven durations; when the recording has too few voiced frames to align, the endpoint falls back to uniform time slicing (`segmentation: "uniform"`).
+
+## Vocal Stability Model
+
+The stability label is produced by a multinomial logistic-regression classifier
+rather than hand-tuned thresholds. Training data is synthesized, but the model
+never sees the synthesis parameters: each clip is rendered to audio, pushed
+through the same `detect_pitch_points` the API uses, and described by the same
+`extract_stability_features`, so the model has to recover the singing regime
+from a genuinely noisy measured contour.
+
+Singing parameters (centre error, drift, vibrato depth, jitter) are sampled
+from continuous ranges and the ground-truth label is derived from them, so many
+clips land near a label boundary and are honestly ambiguous. That is why the
+accuracy below is 85% rather than the ~99% an artificially well-separated
+dataset produces.
+
+```text
+Dataset:        3,000 synthesized clips, class-balanced, seed 20260914
+Split:          75% train / 25% held-out test, stratified
+Test accuracy:  85.3%
+5-fold CV:      86.1%
+Baseline:       random forest 84.9% test / 87.0% CV (not shipped - 60 trees
+                serialize to hundreds of KB for under a point of accuracy)
+```
+
+Per-label F1: `sharp_drift` 0.92, `off_pitch` 0.90, `flat_drift` 0.89,
+`stable` 0.79, `shaky` 0.77. The residual error is concentrated in
+`stable` vs `shaky`, which is expected: a clip sampled just either side of the
+vibrato threshold is close to indistinguishable once detection noise is added.
+
+Retrain and re-export (regenerating the dataset takes a few minutes):
+
+```bash
+cd server
+.venv\Scripts\activate
+python -m pip install -r requirements-dev.txt
+python training/train_stability.py --regenerate
+```
+
+scikit-learn is a **training-time dependency only**. The trainer exports the
+standardizer and coefficients to `app/models/stability_model.json` (about 3 KB)
+and `app/stability_model.py` scores it with NumPy, so the deployed API stays
+light. Before writing the artifact the trainer re-scores the entire test set
+through the runtime inference path and refuses to ship on any disagreement -
+that check is what caught the exported coefficient rows being paired with the
+wrong class labels, since scikit-learn orders `coef_` by `classes_`
+(alphabetical) rather than by any canonical order of ours.
+
+If the model file is missing or malformed, `analyze_stability` silently falls
+back to the original heuristic, and the API response reports which path ran via
+`model_source` (`trained:logistic_regression`, `heuristic`, or
+`insufficient_data`).
 
 ## Pitch Detection Benchmark
 
@@ -359,7 +423,7 @@ Benchmarked custom NumPy-vectorized pitch detector at 100% note detection accura
 10. Use `Listen back` after any analysis to replay your attempt, alone or layered under the harmonium reference.
 11. Open `/practice` for guided drills, alankar paltas, or a custom Sargam phrase with live pitch tracking and onset-aligned sequence scoring.
 12. Open `/sargam` to calibrate the root and practice the full scale in any thaat.
-13. Open `/progress` to review your saved riyaz history, and export/import it as JSON to move it between devices.
+13. Open `/progress` to review your saved riyaz history, see which swara you consistently sing sharp or flat, and export/import your history as JSON to move it between devices.
 14. Install the app from the browser menu - it ships as a PWA with an offline app shell.
 
 ## Resume Summary
@@ -369,7 +433,8 @@ Built SurSadhana AI, a full-stack audio analysis singing practice app using Reac
 ## Known Limitations
 
 - The current pitch detector is optimized for short held notes, not full song transcription.
-- Vocal stability labels are heuristic and should be validated with labeled real vocal recordings before being described as a trained ML model.
+- The vocal stability classifier is trained on synthesized contours, not human recordings. It should be re-validated against labeled real vocal takes before any claim about real-world accuracy.
+- Per-swara tendencies are computed from attempts stored on the current device only, and need at least three attempts per swara before a verdict is shown.
 - Browser microphone quality and background noise can affect pitch detection.
 
 ## Quality Checks

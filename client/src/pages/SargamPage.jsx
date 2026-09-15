@@ -84,6 +84,7 @@ export function SargamPage() {
           mode: "sargam",
           label: `${selectedNote.sargam} / ${selectedNote.note}`,
           targetNote: selectedNote.note,
+          swara: selectedNote.sargam,
           accuracy: nextAnalysis.accuracy,
           centsOff: nextAnalysis.cents_off,
           status: nextAnalysis.status,

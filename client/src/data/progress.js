@@ -23,6 +23,21 @@ export function loadProgress() {
   return readStorage();
 }
 
+function normalizeBreakdown(breakdown) {
+  if (!Array.isArray(breakdown)) {
+    return null;
+  }
+  const rows = breakdown
+    .filter((item) => item && typeof item.swara === "string" && Number.isFinite(item.centsOff))
+    .map((item) => ({
+      swara: item.swara,
+      note: item.note || null,
+      centsOff: Math.round(item.centsOff * 10) / 10,
+      accuracy: Number.isFinite(item.accuracy) ? Math.round(item.accuracy) : null
+    }));
+  return rows.length ? rows : null;
+}
+
 export function saveAttempt(attempt) {
   const entry = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -30,10 +45,12 @@ export function saveAttempt(attempt) {
     mode: attempt.mode,
     label: attempt.label,
     targetNote: attempt.targetNote || null,
+    swara: attempt.swara || null,
     accuracy: Number.isFinite(attempt.accuracy) ? Math.round(attempt.accuracy) : null,
     centsOff: Number.isFinite(attempt.centsOff) ? Math.round(attempt.centsOff * 10) / 10 : null,
     status: attempt.status || null,
-    stabilityLabel: attempt.stabilityLabel || null
+    stabilityLabel: attempt.stabilityLabel || null,
+    breakdown: normalizeBreakdown(attempt.breakdown)
   };
   const entries = [entry, ...readStorage()].slice(0, MAX_ENTRIES);
   writeStorage(entries);

@@ -1165,6 +1165,99 @@ dd {
   width: 100%;
 }
 
+.swara-card {
+  display: grid;
+  gap: 12px;
+}
+
+.swara-headline {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.swara-headline svg {
+  color: #b54b35;
+  flex-shrink: 0;
+}
+
+.swara-list {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.swara-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 2.6rem 1fr 3rem;
+}
+
+.swara-name {
+  color: #24312b;
+  font-weight: 850;
+}
+
+.swara-bar {
+  background: #f7f2e8;
+  border-radius: 4px;
+  display: block;
+  height: 16px;
+  position: relative;
+}
+
+.swara-axis {
+  background: #c9bda6;
+  height: 100%;
+  left: 50%;
+  position: absolute;
+  width: 1px;
+}
+
+.swara-fill {
+  border-radius: 3px;
+  height: 100%;
+  position: absolute;
+}
+
+.verdict-solid .swara-fill {
+  background: #1f6f5b;
+}
+
+.verdict-sharp .swara-fill,
+.verdict-flat .swara-fill {
+  background: #b54b35;
+}
+
+.verdict-inconsistent .swara-fill {
+  background: #c98a1b;
+}
+
+.verdict-insufficient .swara-fill {
+  background: #c9bda6;
+}
+
+.swara-value {
+  color: #5f6f66;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  text-align: right;
+}
+
+.verdict-sharp .swara-value,
+.verdict-flat .swara-value {
+  color: #984126;
+}
+
+.swara-legend {
+  font-size: 0.78rem;
+}
+
 .progress-actions {
   display: flex;
   flex-wrap: wrap;

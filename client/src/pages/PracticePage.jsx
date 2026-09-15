@@ -284,11 +284,21 @@ export function PracticePage() {
       const nextAnalysis = await response.json();
       setAnalysis(nextAnalysis);
       if (nextAnalysis.analysis_status === "pitch_detected") {
+        // Each scored segment lines up with the phrase note at the same index,
+        // so the sequence contributes one per-swara observation per note.
+        const breakdown = (nextAnalysis.segments || []).map((segment, index) => ({
+          swara: notes[index]?.sargam,
+          note: segment.target_note,
+          centsOff: segment.cents_off,
+          accuracy: segment.accuracy
+        }));
+
         saveAttempt({
           mode: "practice",
           label: notes.map((note) => note.sargam).join(" "),
           accuracy: nextAnalysis.sequence_accuracy,
-          status: nextAnalysis.analysis_status
+          status: nextAnalysis.analysis_status,
+          breakdown
         });
       }
     } catch (analysisError) {

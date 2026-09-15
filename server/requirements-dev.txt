@@ -1,3 +1,5 @@
 -r requirements.txt
 httpx==0.28.1
 pytest==8.3.4
+# Training-time only: the deployed API scores the exported weights with NumPy.
+scikit-learn==1.6.1

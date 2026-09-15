@@ -18,6 +18,8 @@ import {
   loadProgress,
   summarizeProgress
 } from "../data/progress.js";
+import { summarizeSwaras } from "../data/swaraStats.js";
+import { SwaraBreakdown } from "../components/SwaraBreakdown.jsx";
 
 const MODE_LABELS = {
   harmonium: "Harmonium",
@@ -50,6 +52,7 @@ export function ProgressPage() {
   );
   const summary = useMemo(() => summarizeProgress(filtered), [filtered]);
   const trend = useMemo(() => buildTrendData(filtered), [filtered]);
+  const swaraRows = useMemo(() => summarizeSwaras(filtered), [filtered]);
 
   function handleClear() {
     clearProgress();
@@ -179,6 +182,8 @@ export function ProgressPage() {
       </section>
 
       <aside className="practice-side">
+        <SwaraBreakdown rows={swaraRows} />
+
         <div className="info-card summary-card">
           <div className="summary-header">
             <div>

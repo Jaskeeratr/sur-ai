@@ -16,3 +16,5 @@ venv/
 *.mov
 server/models/*.pt
 server/benchmark_reports/
+# Regenerable from the recorded seed: python training/train_stability.py --regenerate
+server/training/data/*.csv

@@ -81,6 +81,7 @@ export function HarmoniumPage() {
           mode: "harmonium",
           label: selectedNote.sargam ? `${selectedNote.sargam} / ${selectedNote.note}` : selectedNote.note,
           targetNote: selectedNote.note,
+          swara: selectedNote.sargam || null,
           accuracy: nextAnalysis.accuracy,
           centsOff: nextAnalysis.cents_off,
           status: nextAnalysis.status,
